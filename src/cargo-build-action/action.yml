@@ -1,0 +1,228 @@
+name: Cargo Build
+description: >
+  Composable Cargo build primitive for GitHub Actions. Handles Rust toolchain, dependency caching, targets, Cargo build flags, feature selection, and optional artifact publication without imposing a project-specific matrix.
+
+inputs:
+  toolchain:
+    description: Rust toolchain to use.
+    required: false
+    default: stable
+
+  working-directory:
+    description: Directory containing Cargo.toml.
+    required: false
+    default: .
+
+  package:
+    description: Package to build. Empty builds according to Cargo's workspace rules.
+    required: false
+    default: ""
+
+  workspace:
+    description: Build all workspace packages.
+    required: false
+    default: "false"
+
+  features:
+    description: >
+      Space-separated Cargo feature list. Special values "default" and "all" are translated to the corresponding Cargo flags.
+    required: false
+    default: ""
+
+  all-features:
+    description: Enable all Cargo features.
+    required: false
+    default: "false"
+
+  no-default-features:
+    description: Disable default Cargo features.
+    required: false
+    default: "false"
+
+  all-targets:
+    description: Build all binary, library, example, integration-test and benchmark targets.
+    required: false
+    default: "false"
+
+  target:
+    description: Rust compilation target triple.
+    required: false
+    default: ""
+
+  profile:
+    description: Cargo profile, e.g. dev, release, bench, or a custom profile.
+    required: false
+    default: ""
+
+  release:
+    description: Build using the release profile.
+    required: false
+    default: "false"
+
+  locked:
+    description: Require Cargo.lock to be up to date.
+    required: false
+    default: "true"
+
+  frozen:
+    description: Enable Cargo frozen mode.
+    required: false
+    default: "false"
+
+  offline:
+    description: Enable Cargo offline mode.
+    required: false
+    default: "false"
+
+  verbose:
+    description: Pass --verbose to Cargo.
+    required: false
+    default: "false"
+
+  color:
+    description: Cargo terminal color mode.
+    required: false
+    default: always
+
+  extra-args:
+    description: Additional arguments passed verbatim to cargo build.
+    required: false
+    default: ""
+
+  cache:
+    description: Enable the repository's Rust cache action.
+    required: false
+    default: "true"
+
+  cache-key:
+    description: Shared cache key.
+    required: false
+    default: ""
+
+  cache-workspaces:
+    description: Workspace path(s) passed to cargo-cache.
+    required: false
+    default: .
+
+  artifact:
+    description: Upload target output as an artifact.
+    required: false
+    default: "false"
+
+  artifact-name:
+    description: Artifact name.
+    required: false
+    default: ""
+
+  artifact-path:
+    description: Path to upload when artifact=true.
+    required: false
+    default: ""
+
+  artifact-if-no-files-found:
+    description: upload-artifact behavior when no files exist.
+    required: false
+    default: error
+
+runs:
+  using: composite
+
+  steps:
+  - name: Setup Rust
+    uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+    with:
+      cache: false
+      toolchain: ${{ inputs.toolchain }}
+
+  - name: Setup Rust cache
+    if: inputs.cache == 'true'
+    uses: ./.github/actions/cargo-cache
+    with:
+      key: ${{ inputs.cache-key || format('cargo-build-{0}-{1}', runner.os, inputs.toolchain) }}
+      workspaces: ${{ inputs.cache-workspaces }}
+
+  - name: Build
+    shell: bash
+    working-directory: ${{ inputs.working-directory }}
+    env:
+      CARGO_BUILD_FEATURES: ${{ inputs.features }}
+      CARGO_BUILD_EXTRA_ARGS: ${{ inputs.extra-args }}
+    run: |
+      set -euo pipefail
+
+      args=()
+
+      if [[ "${{ inputs.workspace }}" == "true" ]]; then
+        args+=(--workspace)
+      fi
+
+      if [[ -n "${{ inputs.package }}" ]]; then
+        args+=(--package "${{ inputs.package }}")
+      fi
+
+      if [[ "${{ inputs.all-targets }}" == "true" ]]; then
+        args+=(--all-targets)
+      fi
+
+      if [[ -n "${{ inputs.target }}" ]]; then
+        args+=(--target "${{ inputs.target }}")
+      fi
+
+      if [[ "${{ inputs.release }}" == "true" ]]; then
+        args+=(--release)
+      elif [[ -n "${{ inputs.profile }}" ]]; then
+        args+=(--profile "${{ inputs.profile }}")
+      fi
+
+      if [[ "${{ inputs.all-features }}" == "true" ]]; then
+        args+=(--all-features)
+      elif [[ "${{ inputs.no-default-features }}" == "true" ]]; then
+        args+=(--no-default-features)
+      elif [[ "${CARGO_BUILD_FEATURES}" == "default" ]]; then
+        :
+      elif [[ "${CARGO_BUILD_FEATURES}" == "all" ]]; then
+        args+=(--all-features)
+      elif [[ -n "${CARGO_BUILD_FEATURES}" ]]; then
+        args+=(--features "${CARGO_BUILD_FEATURES}")
+      fi
+
+      if [[ "${{ inputs.locked }}" == "true" ]]; then
+        args+=(--locked)
+      fi
+
+      if [[ "${{ inputs.frozen }}" == "true" ]]; then
+        args+=(--frozen)
+      fi
+
+      if [[ "${{ inputs.offline }}" == "true" ]]; then
+        args+=(--offline)
+      fi
+
+      if [[ "${{ inputs.verbose }}" == "true" ]]; then
+        args+=(--verbose)
+      fi
+
+      if [[ -n "${{ inputs.color }}" ]]; then
+        args+=(--color "${{ inputs.color }}")
+      fi
+
+      if [[ -n "${CARGO_BUILD_EXTRA_ARGS}" ]]; then
+        # Deliberately evaluated as shell words so callers can supply
+        # normal Cargo argument sequences.
+        read -r -a extra <<< "${CARGO_BUILD_EXTRA_ARGS}"
+        args+=("${extra[@]}")
+      fi
+
+      printf 'cargo build'
+      printf ' %q' "${args[@]}"
+      printf '\n'
+
+      cargo build "${args[@]}"
+
+  - name: Upload build artifact
+    if: inputs.artifact == 'true'
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ inputs.artifact-name || format('cargo-build-{0}', runner.os) }}
+      path: ${{ inputs.artifact-path || format('{0}/target', inputs.working-directory) }}
+      if-no-files-found: ${{ inputs.artifact-if-no-files-found }}

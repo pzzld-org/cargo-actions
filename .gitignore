@@ -1,0 +1,226 @@
+
+# ----- [CONFIG] -----
+**/.config/*.config.*
+
+**/settings.local.*
+
+!**/settings.default.*
+.axiom/config/bots/*.toml.bak
+
+!**/.config/default.config.*
+
+
+# ----- [DOTENV] -----
+*.env
+*.env.*
+
+*.local.envrc
+*.envrc.local
+
+*.secret.envrc
+*.envrc.secret
+
+!**/default.env
+
+!**/.env.default
+!**/.default.env.
+
+!**/example.env
+!**/.env.example
+!**/.example.env.
+
+*.secret
+
+# ----- [SHEPHERD] ------
+# .artifacts/ is scratch + FABLE's toolkit. Sprint report DELIVERABLES belong in
+# .shepherd/runs/{run}/reports/ (not ignored); durable ones in .shepherd/docs/reports/.
+**/.artifacts/backups/
+**/.artifacts/cache/
+**/.artifacts/reports/
+**/.artifacts/temp/
+
+**/.shepherd/backups/
+**/.shepherd/cache/
+**/.shepherd/runs/*/.run.json.lock
+**/.shepherd/temp/
+
+!**/.artifacts/**/.gitkeep
+!**/.artifacts/models/
+
+!.shepherd/.gitkeep
+!**/.shepherd/models/
+
+# ----- [WORKTREES] -----
+**/.worktrees/
+**/worktrees/
+
+# ----- [AGENTS] -----
+**/.agents/agent-memory/
+**/.agents/todos/
+
+**/.claude/agent-memory/
+**/.claude/todos/
+
+**/.remember/tmp
+**/remember/tmp
+
+# ----- [PYTHON] -----
+**/.venv/
+**/__pycache__/
+
+**/venv/
+**/dist/
+*.egg-info/
+
+*.pyc
+*.pyo
+*.pyd
+
+# ----- [NODEJS] -----
+**/build/
+**/node_modules/
+
+# ----- [TYPESCRIPT] -----
+*.tsbuildinfo
+
+# ----- [ATOM] -----
+**/.atom/
+
+# ----- [IntelliJ] -----
+**/.idea/
+
+*.iml
+*.ipr
+*.iws
+
+# ----- [VSCODE] -----
+**/.vscode/mcp.json
+**/.vscode/mcp.json
+
+# ----- [WSL] -----
+*:Zone.Identifier
+
+# ----- [NIX] -----
+**/.nix
+**/.nix-channels
+
+!**/flake.lock
+
+# ----- [ONNX] -----
+*.onnx.data
+
+# ----- [PI-CODING-AGENT] -----
+**/.pi
+
+!**/.pi/settings.json
+
+# ----- [RUST] -----
+**/rust_out
+**/target/
+# Lane-private CARGO_TARGET_DIR (shepherd sprint convention: each worktree
+# builds against its own target-<lane> to avoid cross-lane target-lease
+# starvation) — never a real crate name, safe to ignore workspace-wide.
+target-*/
+
+*.rs.bk
+
+*.rlib
+*.rlib.*
+
+!**/Cargo.lock
+
+# ----- [PI] -----
+**/.pi/**/artifacts
+**/.pi/**/missions
+**/.pi/fabric
+**/.pi/subagents
+
+!**/.pi/settings.json
+
+# ----- [SUPABASE] -----
+**/supabase/.temp/
+
+polymarket-builder.json
+
+# ----- [MCP] -----
+**/.mcp.json
+**/mcp.json
+
+# ----- [AXIOM] -----
+**/.axiom/.init
+**/.axiom/cache/
+**/.axiom/data/
+**/.axiom/logs/
+**/.axiom/models/
+/.axiom/axiom/spill/clob-ticks.jsonl
+/.axiom/axiom/spill/spot-ticks.jsonl
+.axiom/axiom/spill/**
+
+!.axiom/**/.gitkeep
+!**/axiom.toml
+
+# ----- [DIRECTORIES] -----
+**/.DS_Store
+**/build/
+**/cache/
+**/deps/
+**/dist/
+**/tmp/
+**/temp/
+
+
+# ----- [FILE-EXTENSIONS] -----
+*.bak
+*.bak.*
+
+*.bk
+*.bk.*
+
+*.db
+*.db.*
+
+*.db-*
+
+*.gz
+*.gz.*
+
+*.local
+*.local.*
+
+*.log
+*.log.*
+
+*.pem
+
+*.sqlite
+*.sqlite.*
+
+*.sqlite3
+*.sqlite3.*
+
+*.zip
+*.zip.*
+
+# ----- [EXCLUSIONS] -----
+!**/.gitkeep
+
+!**/src/**/build
+!**/src/**/cache
+!**/src/**/config
+!**/src/**/data
+!**/src/**/tmp
+
+# ----- [TRACKED-JUNK CLASSES] -----
+# Enforced mechanically by .shepherd/scripts/check-tracked-junk.sh. A rule alone
+# cannot hold this line: .shepherd/runs/v039-dev2/events/hooks-2026-08-25.jsonl
+# was ALREADY covered by `runs/**` and still reached 2.8 MB in the index,
+# because gitignore does not apply to a path that is already tracked and
+# `git check-ignore` stays silent about tracked paths unless you pass
+# --no-index. The gate compares the index against the rules directly.
+.fuse_hidden*
+*.orig
+*.rej
+*.bak
+*.bak-*
+*.techdebt-draft
+**/events/*.jsonl

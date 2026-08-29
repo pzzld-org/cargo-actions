@@ -1,0 +1,26 @@
+name: Setup Rust cache
+description: Enable the shared sccache and Rust dependency cache layers
+inputs:
+  key:
+    description: Stable cache key for this job and matrix leg
+    required: true
+  workspaces:
+    description: Cargo workspace root(s) to cache, relative to the job workspace
+    required: false
+    default: "."
+runs:
+  using: composite
+  steps:
+  - name: Setup sccache
+    uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+  - name: Enable the sccache GitHub Actions backend
+    shell: bash
+    run: |
+      echo "RUSTC_WRAPPER=sccache" >> "${GITHUB_ENV}"
+      echo "SCCACHE_GHA_ENABLED=true" >> "${GITHUB_ENV}"
+  - name: Setup rust-cache
+    uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+    with:
+      shared-key: ${{ inputs.key }}
+      cache-targets: false
+      workspaces: ${{ inputs.workspaces }}
