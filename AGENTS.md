@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Visit the [agents home](.agents/README.md) (@.agents/README.md) for workspace specific context.
+Visit the [agents home](.agents/README.md) (@.agents/README.md) for mutable, workspace specific context.
 
 ## How to work (high-level mindset)
 
