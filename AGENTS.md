@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Visit the [agents home](.agents/README.md) (@.agents/README.md) for workspace specific context.
+
 ## How to work (high-level mindset)
 
 **This section is non-negotiable and must never be removed.**
