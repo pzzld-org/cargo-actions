@@ -15,12 +15,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Validate action YAML
+        run: ruby tests/test-action-yaml.rb
       - name: Validate shared shell
         shell: bash
-        run: bash -n src/_shared/cargo-command.sh
+        run: |
+          bash -n src/_shared/cargo-command.sh
+          bash -n src/_shared/nextest-command.sh
+          bash -n src/_shared/criterion-command.sh
       - name: Exercise Cargo command grammar
         shell: bash
         run: bash tests/test-cargo-command.sh
+      - name: Exercise tool runner grammar
+        shell: bash
+        run: bash tests/test-tool-runners.sh
       - name: Validate action metadata contracts
         run: python3 tests/test_action_contracts.py
       - name: Evaluate public action surface
@@ -50,9 +58,15 @@ jobs:
           working-directory: tests/fixtures/minimal-crate
           all-targets: "true"
           cache: "false"
-      - name: Test
+      - name: Test with default nextest runner
         uses: ./src/cargo-test-action
         with:
+          working-directory: tests/fixtures/minimal-crate
+          cache: "false"
+      - name: Test cargo fallback
+        uses: ./src/cargo-test-action
+        with:
+          runner: cargo
           working-directory: tests/fixtures/minimal-crate
           cache: "false"
       - name: Clippy
@@ -72,9 +86,16 @@ jobs:
           working-directory: tests/fixtures/minimal-crate
           no-deps: "true"
           cache: "false"
-      - name: Bench compile
+      - name: Bench compile with default criterion runner
         uses: ./src/cargo-bench-action
         with:
+          working-directory: tests/fixtures/minimal-crate
+          no-run: "true"
+          cache: "false"
+      - name: Bench cargo fallback
+        uses: ./src/cargo-bench-action
+        with:
+          runner: cargo
           working-directory: tests/fixtures/minimal-crate
           no-run: "true"
           cache: "false"

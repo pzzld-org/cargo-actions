@@ -8,8 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "cargo-build-action": ("build", "target", "features", "artifact"),
     "cargo-check-action": ("check", "target", "features", "cache"),
-    "cargo-test-action": ("test", "filter", "test-args", "no-run"),
-    "cargo-bench-action": ("bench", "filter", "bench-args", "no-run"),
+    "cargo-test-action": ("runner", "default: nextest", "cargo-nextest", "nextest-profile", "test-args", 'cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test'),
+    "cargo-bench-action": ("runner", "default: criterion", "cargo-criterion", "criterion-output-format", "bench-args", 'cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" bench'),
     "cargo-clippy-action": ("clippy", "clippy-args", "deny-warnings", "no-deps"),
     "cargo-doc-action": ("doc", "document-private-items", "no-deps", "target"),
     "cargo-fmt-action": ("fmt", "check", "workspace", "rustfmt"),
@@ -27,18 +27,29 @@ def main() -> int:
         for needle in needles:
             checks.append({"action": directory, "criterion": needle, "passed": needle in text})
 
-    shared = ROOT / "src/_shared/cargo-command.sh"
-    shared_text = shared.read_text() if shared.is_file() else ""
-    for needle in (
-        "append_common_package_args",
-        "append_common_target_args",
-        "append_common_feature_args",
-        "append_common_compile_args",
-        "append_common_manifest_args",
-        "append_raw_lines",
-        'exec cargo "${args[@]}"',
-    ):
-        checks.append({"action": "_shared", "criterion": needle, "passed": needle in shared_text})
+    shared_checks = {
+        "cargo-command.sh": (
+            "append_common_package_args",
+            "append_common_target_args",
+            "append_common_feature_args",
+            'exec cargo "${args[@]}"',
+        ),
+        "nextest-command.sh": ("args=(nextest run)", "--build-jobs", "--filterset", 'exec cargo "${args[@]}"'),
+        "criterion-command.sh": ("args=(criterion)", "--output-format", "--criterion-manifest-path", 'exec cargo "${args[@]}"'),
+    }
+    for filename, needles in shared_checks.items():
+        path = ROOT / "src/_shared" / filename
+        text = path.read_text() if path.is_file() else ""
+        for needle in needles:
+            checks.append({"action": f"_shared/{filename}", "criterion": needle, "passed": needle in text})
+
+    for directory in ("cargo-test-action", "cargo-bench-action"):
+        text = (ROOT / "src" / directory / "action.yml").read_text()
+        for needle in (
+            "taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf",
+            "fallback: cargo-binstall",
+        ):
+            checks.append({"action": directory, "criterion": needle, "passed": needle in text})
 
     passed = sum(bool(check["passed"]) for check in checks)
     score = passed / len(checks)

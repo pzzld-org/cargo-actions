@@ -17,8 +17,8 @@ ACTIONS = {
     "cache": ROOT / "src/setup-rust-cache/action.yml",
 }
 
-PINNED_USE = re.compile(r"^\s*uses:\s*([^@\s]+)@([0-9a-f]{40})\s*$", re.MULTILINE)
-ANY_USE = re.compile(r"^\s*uses:\s*(\S+)\s*$", re.MULTILINE)
+PINNED_USE = re.compile(r"^\s*uses:\s*([^@\s]+)@([0-9a-f]{40})(?:\s+#.*)?$", re.MULTILINE)
+ANY_USE = re.compile(r"^\s*uses:\s*(\S+)(?:\s+#.*)?$", re.MULTILINE)
 
 
 def fail(message: str) -> None:
@@ -52,15 +52,35 @@ def main() -> int:
         text = texts[name]
         if not re.search(r"target:\s*['\"]?\$\{\{ inputs\.target \}\}['\"]?", text):
             fail(f"{name}: requested Rust target is not installed by setup-rust-toolchain")
-        if 'mozilla-actions/sccache-action@' not in text:
+        if "mozilla-actions/sccache-action@" not in text:
             fail(f"{name}: sccache layer missing")
-        if 'Swatinem/rust-cache@' not in text:
+        if "Swatinem/rust-cache@" not in text:
             fail(f"{name}: Rust dependency cache layer missing")
-        expected = f'bash "${{GITHUB_ACTION_PATH}}/../_shared/cargo-command.sh" {name}'
-        if expected not in text:
-            fail(f"{name}: shared Cargo command runner not wired")
         if "one complete argument per line" not in text:
             fail(f"{name}: extra-argument contract is undocumented")
+
+    for name in ("build", "check", "clippy", "doc"):
+        expected = f'bash "${{GITHUB_ACTION_PATH}}/../_shared/cargo-command.sh" {name}'
+        if expected not in texts[name]:
+            fail(f"{name}: shared Cargo command runner not wired")
+
+    if "default: nextest" not in texts["test"]:
+        fail("test: cargo-nextest is not the default runner")
+    if "taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf" not in texts["test"]:
+        fail("test: pinned taiki-e/install-action missing")
+    if "fallback: cargo-binstall" not in texts["test"]:
+        fail("test: cargo-binstall fallback missing")
+    if '_shared/nextest-command.sh' not in texts["test"] or '_shared/cargo-command.sh" test' not in texts["test"]:
+        fail("test: nextest/cargo runner dispatch missing")
+
+    if "default: criterion" not in texts["bench"]:
+        fail("bench: cargo-criterion is not the default runner")
+    if "taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf" not in texts["bench"]:
+        fail("bench: pinned taiki-e/install-action missing")
+    if "fallback: cargo-binstall" not in texts["bench"]:
+        fail("bench: cargo-binstall fallback missing")
+    if '_shared/criterion-command.sh' not in texts["bench"] or '_shared/cargo-command.sh" bench' not in texts["bench"]:
+        fail("bench: criterion/cargo runner dispatch missing")
 
     if "components: clippy" not in texts["clippy"]:
         fail("clippy: clippy component is not installed")
@@ -69,9 +89,9 @@ def main() -> int:
     if "actions/upload-artifact@" not in texts["build"]:
         fail("build: artifact publishing support missing")
     if "CARGO_ACTION_TRAILING_ARGS: ${{ inputs.test-args }}" not in texts["test"]:
-        fail("test: test harness argument forwarding missing")
+        fail("test: test runner argument forwarding missing")
     if "CARGO_ACTION_TRAILING_ARGS: ${{ inputs.bench-args }}" not in texts["bench"]:
-        fail("bench: benchmark harness argument forwarding missing")
+        fail("bench: benchmark runner argument forwarding missing")
     if "CARGO_ACTION_TRAILING_ARGS: ${{ inputs.clippy-args }}" not in texts["clippy"]:
         fail("clippy: lint argument forwarding missing")
     if "CARGO_ACTION_DENY_WARNINGS: ${{ inputs.deny-warnings }}" not in texts["clippy"]:
@@ -91,6 +111,19 @@ def main() -> int:
             fail(f"shared runner is missing primitive: {primitive}")
     if "eval " in shared:
         fail("shared runner must not shell-evaluate caller-provided arguments")
+
+    nextest = read(ROOT / "src/_shared/nextest-command.sh")
+    criterion = read(ROOT / "src/_shared/criterion-command.sh")
+    for name, script, prefix in (
+        ("nextest", nextest, "args=(nextest run)"),
+        ("criterion", criterion, "args=(criterion)"),
+    ):
+        if prefix not in script:
+            fail(f"{name}: runner prefix missing")
+        if 'exec cargo "${args[@]}"' not in script:
+            fail(f"{name}: runner does not exec Cargo directly")
+        if "eval " in script:
+            fail(f"{name}: runner must not shell-evaluate caller-provided arguments")
 
     print("action metadata contracts: ok")
     return 0

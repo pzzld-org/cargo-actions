@@ -1,6 +1,15 @@
 name: Cargo Test
-description: Build and run Rust tests with Cargo while preserving test-harness argument forwarding.
+description: Run Rust tests with cargo-nextest by default, with cargo test available as a fallback.
 inputs:
+  runner: {description: 'Test runner: nextest or cargo.', required: false, default: nextest}
+  nextest-version: {description: cargo-nextest version passed to taiki-e/install-action. Empty selects the installer default., required: false, default: ''}
+  nextest-profile: {description: nextest execution profile selected with --profile., required: false, default: ''}
+  nextest-retries: {description: Number of nextest retries for failing tests., required: false, default: ''}
+  nextest-test-threads: {description: Number of nextest test threads, or num-cpus., required: false, default: ''}
+  nextest-filterset: {description: nextest filterset expressions, one complete expression per line., required: false, default: ''}
+  nextest-partition: {description: 'nextest partition such as hash:1/2 or count:1/2.', required: false, default: ''}
+  nextest-run-ignored: {description: nextest ignored-test behavior such as default, only, or all., required: false, default: ''}
+  nextest-no-tests: {description: nextest behavior when no tests match such as pass, warn, or fail., required: false, default: ''}
   toolchain: {description: Rust toolchain to use., required: false, default: stable}
   working-directory: {description: Directory containing the Cargo project., required: false, default: .}
   manifest-path: {description: Path to Cargo.toml, relative to working-directory., required: false, default: ''}
@@ -22,34 +31,40 @@ inputs:
   benches: {description: Select all benchmark targets., required: false, default: 'false'}
   all-targets: {description: Select all available targets., required: false, default: 'false'}
   target: {description: Compilation target triple. The target is installed with the selected toolchain., required: false, default: ''}
-  jobs: {description: Number of parallel Cargo jobs., required: false, default: ''}
-  profile: {description: Cargo profile name. Mutually exclusive with release=true., required: false, default: ''}
+  jobs: {description: Number of parallel Cargo build jobs. For nextest this maps to --build-jobs., required: false, default: ''}
+  profile: {description: Cargo compilation profile. For nextest this maps to --cargo-profile., required: false, default: ''}
   release: {description: Use the release profile., required: false, default: 'false'}
   target-dir: {description: Directory for generated artifacts, relative to working-directory unless absolute., required: false, default: ''}
   locked: {description: Require Cargo.lock to be up to date., required: false, default: 'true'}
   frozen: {description: Disallow network and Cargo.lock changes., required: false, default: 'false'}
   offline: {description: Disallow network access., required: false, default: 'false'}
   ignore-rust-version: {description: Ignore package rust-version declarations., required: false, default: 'false'}
-  verbose: {description: Enable verbose Cargo output., required: false, default: 'false'}
-  quiet: {description: Suppress Cargo output., required: false, default: 'false'}
-  color: {description: 'Cargo terminal color mode: auto, always, or never.', required: false, default: always}
-  message-format: {description: Cargo message format, for example human, short, json, or json-diagnostic-short., required: false, default: ''}
-  extra-args: {description: Additional Cargo arguments, one complete argument per line. Values are not shell-evaluated., required: false, default: ''}
+  verbose: {description: Enable verbose output., required: false, default: 'false'}
+  quiet: {description: Suppress Cargo output. Supported by runner=cargo only., required: false, default: 'false'}
+  color: {description: 'Terminal color mode: auto, always, or never.', required: false, default: always}
+  message-format: {description: Cargo build message format. nextest maps this to --cargo-message-format., required: false, default: ''}
+  extra-args: {description: Additional runner arguments, one complete argument per line. Values are not shell-evaluated., required: false, default: ''}
   cache: {description: Enable sccache and Rust dependency caching., required: false, default: 'true'}
   cache-key: {description: Override the shared Rust cache key. Empty derives a command/OS/toolchain/target key., required: false, default: ''}
   cache-workspaces: {description: Cargo workspace roots passed to Swatinem/rust-cache., required: false, default: .}
   config: {description: Cargo configuration overrides, one KEY=VALUE or path per line., required: false, default: ''}
-  future-incompat-report: {description: Display the latest future-incompatibility report., required: false, default: 'false'}
+  future-incompat-report: {description: Display the latest future-incompatibility report. Supported by runner=cargo only., required: false, default: 'false'}
   no-run: {description: Compile tests without running them., required: false, default: 'false'}
   no-fail-fast: {description: Run all tests even after failures., required: false, default: 'false'}
-  filter: {description: Optional positional test-name filter passed before --., required: false, default: ''}
-  test-args: {description: Arguments forwarded after cargo test --, one complete argument per line., required: false, default: ''}
+  filter: {description: Optional positional test-name filter., required: false, default: ''}
+  test-args: {description: Arguments forwarded after --, one complete argument per line., required: false, default: ''}
 runs:
   using: composite
   steps:
   - name: Setup Rust
     uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
     with: {cache: 'false', toolchain: '${{ inputs.toolchain }}', target: '${{ inputs.target }}'}
+  - name: Install cargo-nextest
+    if: inputs.runner == 'nextest'
+    uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
+    with:
+      tool: ${{ inputs.nextest-version == '' && 'cargo-nextest' || format('cargo-nextest@{0}', inputs.nextest-version) }}
+      fallback: cargo-binstall
   - name: Setup sccache
     if: inputs.cache == 'true'
     uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
@@ -62,11 +77,12 @@ runs:
   - name: Setup Rust dependency cache
     if: inputs.cache == 'true'
     uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-    with: {shared-key: "${{ inputs.cache-key || format('test-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}", cache-targets: 'false', workspaces: '${{ inputs.cache-workspaces }}'}
-  - name: Cargo Test
+    with: {shared-key: "${{ inputs.cache-key || format('test-{0}-{1}-{2}-{3}', inputs.runner, runner.os, inputs.toolchain, inputs.target || 'host') }}", cache-targets: 'false', workspaces: '${{ inputs.cache-workspaces }}'}
+  - name: Run tests
     shell: bash
     working-directory: ${{ inputs.working-directory }}
     env:
+      CARGO_ACTION_RUNNER: ${{ inputs.runner }}
       CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
       CARGO_ACTION_PACKAGE: ${{ inputs.package }}
       CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
@@ -105,4 +121,16 @@ runs:
       CARGO_ACTION_NO_FAIL_FAST: ${{ inputs.no-fail-fast }}
       CARGO_ACTION_FILTER: ${{ inputs.filter }}
       CARGO_ACTION_TRAILING_ARGS: ${{ inputs.test-args }}
-    run: bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test
+      NEXTEST_ACTION_PROFILE: ${{ inputs.nextest-profile }}
+      NEXTEST_ACTION_RETRIES: ${{ inputs.nextest-retries }}
+      NEXTEST_ACTION_TEST_THREADS: ${{ inputs.nextest-test-threads }}
+      NEXTEST_ACTION_FILTERSET: ${{ inputs.nextest-filterset }}
+      NEXTEST_ACTION_PARTITION: ${{ inputs.nextest-partition }}
+      NEXTEST_ACTION_RUN_IGNORED: ${{ inputs.nextest-run-ignored }}
+      NEXTEST_ACTION_NO_TESTS: ${{ inputs.nextest-no-tests }}
+    run: |
+      case "${CARGO_ACTION_RUNNER}" in
+        nextest) exec bash "${GITHUB_ACTION_PATH}/../_shared/nextest-command.sh" ;;
+        cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test ;;
+        *) echo "cargo-actions: unsupported test runner: ${CARGO_ACTION_RUNNER}" >&2; exit 2 ;;
+      esac

@@ -14,6 +14,78 @@
     locked: "true"
 ```
 
+## Test with nextest (default)
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+  with:
+    workspace: "true"
+    nextest-profile: ci
+    nextest-retries: "2"
+```
+
+The action installs `cargo-nextest` through the pinned `taiki-e/install-action`, with `cargo-binstall` configured as its fallback installation path.
+
+Use nextest-native filtersets when useful:
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+  with:
+    nextest-filterset: |
+      package(core) & not test(slow)
+      package(cli)
+    nextest-test-threads: num-cpus
+```
+
+Test-name filters and libtest-compatible arguments after `--` remain available:
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+  with:
+    filter: parser
+    test-args: |
+      --nocapture
+      --exact
+```
+
+To use standard Cargo instead:
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+  with:
+    runner: cargo
+    workspace: "true"
+```
+
+## Benchmark with Criterion (default)
+
+Projects define their Criterion-compatible benchmark targets in `Cargo.toml`; the action installs and runs `cargo-criterion` by default.
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+  with:
+    workspace: "true"
+    criterion-output-format: criterion
+    criterion-plotting-backend: plotters
+```
+
+Compile without executing benchmarks:
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+  with:
+    no-run: "true"
+```
+
+Use standard `cargo bench` when you need Cargo-specific benchmark behavior such as a custom Cargo profile or raw Cargo configuration overrides:
+
+```yaml
+- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+  with:
+    runner: cargo
+    profile: ci-bench
+```
+
 ## Build a feature matrix
 
 ```yaml
@@ -56,24 +128,6 @@ jobs:
 
 The target is installed with the requested Rust toolchain before Cargo runs.
 
-## Test with harness arguments
-
-```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
-  with:
-    workspace: "true"
-    filter: parser
-    test-args: |
-      --nocapture
-      --test-threads=1
-```
-
-This produces the semantic equivalent of:
-
-```text
-cargo test --workspace --locked --color always parser -- --nocapture --test-threads=1
-```
-
 ## Clippy
 
 ```yaml
@@ -94,20 +148,26 @@ cargo test --workspace --locked --color always parser -- --nocapture --test-thre
     check: "true"
 ```
 
-## Additional Cargo arguments
+## Additional runner arguments
 
 Repeated or escape-hatch values use one complete value per line:
+
+```yaml
+with:
+  extra-args: |
+    --timings
+```
+
+Cargo-native actions can also use configuration overrides:
 
 ```yaml
 with:
   config: |
     net.retry=2
     build.incremental=false
-  extra-args: |
-    --timings
 ```
 
-The action does not shell-evaluate these values.
+No runner shell-evaluates these values.
 
 ## Disable integrated caching
 
