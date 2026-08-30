@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: action contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Validate shared shell
+        shell: bash
+        run: bash -n src/_shared/cargo-command.sh
+      - name: Exercise Cargo command grammar
+        shell: bash
+        run: bash tests/test-cargo-command.sh
+      - name: Validate action metadata contracts
+        run: python3 tests/test_action_contracts.py
+      - name: Evaluate public action surface
+        run: python3 evals/eval_action_surface.py
+
+  smoke:
+    name: smoke (${{ matrix.os }})
+    needs: contracts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build
+        uses: ./src/cargo-build-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          all-targets: "true"
+          features: full
+          cache-key: smoke-${{ runner.os }}
+      - name: Check
+        uses: ./src/cargo-check-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          all-targets: "true"
+          cache: "false"
+      - name: Test
+        uses: ./src/cargo-test-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          cache: "false"
+      - name: Clippy
+        uses: ./src/cargo-clippy-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          all-targets: "true"
+          deny-warnings: "true"
+          cache: "false"
+      - name: Format
+        uses: ./src/cargo-fmt-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+      - name: Documentation
+        uses: ./src/cargo-doc-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          no-deps: "true"
+          cache: "false"
+      - name: Bench compile
+        uses: ./src/cargo-bench-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          no-run: "true"
+          cache: "false"

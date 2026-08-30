@@ -1,0 +1,13 @@
+[package]
+name = "cargo-actions-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+full = []
+
+[[bench]]
+name = "smoke"
+harness = false

@@ -1,0 +1,30 @@
+name: Cargo Fmt
+description: Run rustfmt through cargo fmt with workspace/package selection and check mode.
+inputs:
+  toolchain: {description: Rust toolchain to use., required: false, default: stable}
+  working-directory: {description: Directory containing the Cargo project., required: false, default: .}
+  manifest-path: {description: Path to Cargo.toml, relative to working-directory., required: false, default: ''}
+  package: {description: Single package specification passed with --package., required: false, default: ''}
+  packages: {description: Additional package specifications, one per line., required: false, default: ''}
+  workspace: {description: Format all workspace members (maps to cargo fmt --all)., required: false, default: 'true'}
+  check: {description: Check formatting without modifying files., required: false, default: 'true'}
+  message-format: {description: rustfmt message format when supported., required: false, default: ''}
+  extra-args: {description: Additional cargo fmt arguments, one complete argument per line. Values are not shell-evaluated., required: false, default: ''}
+runs:
+  using: composite
+  steps:
+  - name: Setup Rust
+    uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+    with: {cache: 'false', toolchain: '${{ inputs.toolchain }}', components: rustfmt}
+  - name: Cargo Fmt
+    shell: bash
+    working-directory: ${{ inputs.working-directory }}
+    env:
+      CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
+      CARGO_ACTION_PACKAGE: ${{ inputs.package }}
+      CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
+      CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
+      CARGO_ACTION_CHECK: ${{ inputs.check }}
+      CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
+      CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
+    run: bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" fmt

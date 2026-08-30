@@ -1,228 +1,256 @@
 name: Cargo Build
-description: >
-  Composable Cargo build primitive for GitHub Actions. Handles Rust toolchain, dependency caching, targets, Cargo build flags, feature selection, and optional artifact publication without imposing a project-specific matrix.
-
+description: Build Rust crates and workspaces with a reusable, matrix-agnostic Cargo interface.
 inputs:
   toolchain:
     description: Rust toolchain to use.
     required: false
     default: stable
-
   working-directory:
-    description: Directory containing Cargo.toml.
+    description: Directory containing the Cargo project.
     required: false
     default: .
-
+  manifest-path:
+    description: Path to Cargo.toml, relative to working-directory.
+    required: false
+    default: ''
   package:
-    description: Package to build. Empty builds according to Cargo's workspace rules.
+    description: Single package specification passed with --package.
     required: false
-    default: ""
-
+    default: ''
+  packages:
+    description: Additional package specifications, one per line.
+    required: false
+    default: ''
   workspace:
-    description: Build all workspace packages.
+    description: Operate on all workspace members.
     required: false
-    default: "false"
-
+    default: 'false'
+  exclude:
+    description: Workspace package specifications to exclude, one per line.
+    required: false
+    default: ''
   features:
-    description: >
-      Space-separated Cargo feature list. Special values "default" and "all" are translated to the corresponding Cargo flags.
+    description: Cargo feature list. Cargo accepts comma- or space-separated values. "default" is a no-op; "all" maps to --all-features.
     required: false
-    default: ""
-
+    default: ''
   all-features:
-    description: Enable all Cargo features.
+    description: Enable all features.
     required: false
-    default: "false"
-
+    default: 'false'
   no-default-features:
-    description: Disable default Cargo features.
+    description: Disable default features.
     required: false
-    default: "false"
-
+    default: 'false'
+  lib:
+    description: Select the library target.
+    required: false
+    default: 'false'
+  bin:
+    description: Binary target names, one per line.
+    required: false
+    default: ''
+  bins:
+    description: Select all binary targets.
+    required: false
+    default: 'false'
+  example:
+    description: Example target names, one per line.
+    required: false
+    default: ''
+  examples:
+    description: Select all example targets.
+    required: false
+    default: 'false'
+  test:
+    description: Integration test target names, one per line.
+    required: false
+    default: ''
+  tests:
+    description: Select all integration test targets.
+    required: false
+    default: 'false'
+  bench:
+    description: Benchmark target names, one per line.
+    required: false
+    default: ''
+  benches:
+    description: Select all benchmark targets.
+    required: false
+    default: 'false'
   all-targets:
-    description: Build all binary, library, example, integration-test and benchmark targets.
+    description: Select all available targets.
     required: false
-    default: "false"
-
+    default: 'false'
   target:
-    description: Rust compilation target triple.
+    description: Compilation target triple. The target is installed with the selected toolchain.
     required: false
-    default: ""
-
+    default: ''
+  jobs:
+    description: Number of parallel Cargo jobs.
+    required: false
+    default: ''
+  keep-going:
+    description: Continue building unaffected units after an error.
+    required: false
+    default: 'false'
   profile:
-    description: Cargo profile, e.g. dev, release, bench, or a custom profile.
+    description: Cargo profile name. Mutually exclusive with release=true.
     required: false
-    default: ""
-
+    default: ''
   release:
-    description: Build using the release profile.
+    description: Use the release profile.
     required: false
-    default: "false"
-
+    default: 'false'
+  target-dir:
+    description: Directory for generated artifacts, relative to working-directory unless absolute.
+    required: false
+    default: ''
   locked:
     description: Require Cargo.lock to be up to date.
     required: false
-    default: "true"
-
+    default: 'true'
   frozen:
-    description: Enable Cargo frozen mode.
+    description: Disallow network and Cargo.lock changes.
     required: false
-    default: "false"
-
+    default: 'false'
   offline:
-    description: Enable Cargo offline mode.
+    description: Disallow network access.
     required: false
-    default: "false"
-
+    default: 'false'
+  ignore-rust-version:
+    description: Ignore package rust-version declarations.
+    required: false
+    default: 'false'
   verbose:
-    description: Pass --verbose to Cargo.
+    description: Enable verbose Cargo output.
     required: false
-    default: "false"
-
+    default: 'false'
+  quiet:
+    description: Suppress Cargo output.
+    required: false
+    default: 'false'
   color:
-    description: Cargo terminal color mode.
+    description: 'Cargo terminal color mode: auto, always, or never.'
     required: false
     default: always
-
+  message-format:
+    description: Cargo message format, for example human, short, json, or json-diagnostic-short.
+    required: false
+    default: ''
   extra-args:
-    description: Additional arguments passed verbatim to cargo build.
+    description: Additional Cargo arguments, one complete argument per line. Values are not shell-evaluated.
     required: false
-    default: ""
-
+    default: ''
   cache:
-    description: Enable the repository's Rust cache action.
+    description: Enable sccache and Rust dependency caching.
     required: false
-    default: "true"
-
+    default: 'true'
   cache-key:
-    description: Shared cache key.
+    description: Override the shared Rust cache key. Empty derives a command/OS/toolchain/target key.
     required: false
-    default: ""
-
+    default: ''
   cache-workspaces:
-    description: Workspace path(s) passed to cargo-cache.
+    description: Cargo workspace roots passed to Swatinem/rust-cache.
     required: false
     default: .
-
+  config:
+    description: Cargo configuration overrides, one KEY=VALUE or path per line.
+    required: false
+    default: ''
+  future-incompat-report:
+    description: Display the latest future-incompatibility report.
+    required: false
+    default: 'false'
   artifact:
-    description: Upload target output as an artifact.
+    description: Upload build outputs as a workflow artifact.
     required: false
-    default: "false"
-
+    default: 'false'
   artifact-name:
-    description: Artifact name.
+    description: Artifact name. Empty derives cargo-build-<os>.
     required: false
-    default: ""
-
+    default: ''
   artifact-path:
-    description: Path to upload when artifact=true.
+    description: Artifact path. Empty uses target-dir or <working-directory>/target.
     required: false
-    default: ""
-
+    default: ''
   artifact-if-no-files-found:
-    description: upload-artifact behavior when no files exist.
+    description: upload-artifact behavior when no files are found.
     required: false
     default: error
-
+  artifact-retention-days:
+    description: Artifact retention in days.
+    required: false
+    default: '7'
 runs:
   using: composite
-
   steps:
   - name: Setup Rust
     uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
     with:
-      cache: false
+      cache: 'false'
       toolchain: ${{ inputs.toolchain }}
-
-  - name: Setup Rust cache
+      target: ${{ inputs.target }}
+  - name: Setup sccache
     if: inputs.cache == 'true'
-    uses: ./.github/actions/cargo-cache
-    with:
-      key: ${{ inputs.cache-key || format('cargo-build-{0}-{1}', runner.os, inputs.toolchain) }}
-      workspaces: ${{ inputs.cache-workspaces }}
+    uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+  - name: Enable sccache GitHub Actions backend
+    if: inputs.cache == 'true'
+    shell: bash
+    run: 'echo "RUSTC_WRAPPER=sccache" >> "${GITHUB_ENV}"
 
-  - name: Build
+      echo "SCCACHE_GHA_ENABLED=true" >> "${GITHUB_ENV}"'
+  - name: Setup Rust dependency cache
+    if: inputs.cache == 'true'
+    uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+    with:
+      shared-key: ${{ inputs.cache-key || format('build-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
+      cache-targets: 'false'
+      workspaces: ${{ inputs.cache-workspaces }}
+  - name: Cargo Build
     shell: bash
     working-directory: ${{ inputs.working-directory }}
     env:
-      CARGO_BUILD_FEATURES: ${{ inputs.features }}
-      CARGO_BUILD_EXTRA_ARGS: ${{ inputs.extra-args }}
-    run: |
-      set -euo pipefail
-
-      args=()
-
-      if [[ "${{ inputs.workspace }}" == "true" ]]; then
-        args+=(--workspace)
-      fi
-
-      if [[ -n "${{ inputs.package }}" ]]; then
-        args+=(--package "${{ inputs.package }}")
-      fi
-
-      if [[ "${{ inputs.all-targets }}" == "true" ]]; then
-        args+=(--all-targets)
-      fi
-
-      if [[ -n "${{ inputs.target }}" ]]; then
-        args+=(--target "${{ inputs.target }}")
-      fi
-
-      if [[ "${{ inputs.release }}" == "true" ]]; then
-        args+=(--release)
-      elif [[ -n "${{ inputs.profile }}" ]]; then
-        args+=(--profile "${{ inputs.profile }}")
-      fi
-
-      if [[ "${{ inputs.all-features }}" == "true" ]]; then
-        args+=(--all-features)
-      elif [[ "${{ inputs.no-default-features }}" == "true" ]]; then
-        args+=(--no-default-features)
-      elif [[ "${CARGO_BUILD_FEATURES}" == "default" ]]; then
-        :
-      elif [[ "${CARGO_BUILD_FEATURES}" == "all" ]]; then
-        args+=(--all-features)
-      elif [[ -n "${CARGO_BUILD_FEATURES}" ]]; then
-        args+=(--features "${CARGO_BUILD_FEATURES}")
-      fi
-
-      if [[ "${{ inputs.locked }}" == "true" ]]; then
-        args+=(--locked)
-      fi
-
-      if [[ "${{ inputs.frozen }}" == "true" ]]; then
-        args+=(--frozen)
-      fi
-
-      if [[ "${{ inputs.offline }}" == "true" ]]; then
-        args+=(--offline)
-      fi
-
-      if [[ "${{ inputs.verbose }}" == "true" ]]; then
-        args+=(--verbose)
-      fi
-
-      if [[ -n "${{ inputs.color }}" ]]; then
-        args+=(--color "${{ inputs.color }}")
-      fi
-
-      if [[ -n "${CARGO_BUILD_EXTRA_ARGS}" ]]; then
-        # Deliberately evaluated as shell words so callers can supply
-        # normal Cargo argument sequences.
-        read -r -a extra <<< "${CARGO_BUILD_EXTRA_ARGS}"
-        args+=("${extra[@]}")
-      fi
-
-      printf 'cargo build'
-      printf ' %q' "${args[@]}"
-      printf '\n'
-
-      cargo build "${args[@]}"
-
+      CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
+      CARGO_ACTION_PACKAGE: ${{ inputs.package }}
+      CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
+      CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
+      CARGO_ACTION_EXCLUDE: ${{ inputs.exclude }}
+      CARGO_ACTION_FEATURES: ${{ inputs.features }}
+      CARGO_ACTION_ALL_FEATURES: ${{ inputs.all-features }}
+      CARGO_ACTION_NO_DEFAULT_FEATURES: ${{ inputs.no-default-features }}
+      CARGO_ACTION_LIB: ${{ inputs.lib }}
+      CARGO_ACTION_BIN: ${{ inputs.bin }}
+      CARGO_ACTION_BINS: ${{ inputs.bins }}
+      CARGO_ACTION_EXAMPLE: ${{ inputs.example }}
+      CARGO_ACTION_EXAMPLES: ${{ inputs.examples }}
+      CARGO_ACTION_TEST: ${{ inputs.test }}
+      CARGO_ACTION_TESTS: ${{ inputs.tests }}
+      CARGO_ACTION_BENCH: ${{ inputs.bench }}
+      CARGO_ACTION_BENCHES: ${{ inputs.benches }}
+      CARGO_ACTION_ALL_TARGETS: ${{ inputs.all-targets }}
+      CARGO_ACTION_TARGET: ${{ inputs.target }}
+      CARGO_ACTION_JOBS: ${{ inputs.jobs }}
+      CARGO_ACTION_KEEP_GOING: ${{ inputs.keep-going }}
+      CARGO_ACTION_PROFILE: ${{ inputs.profile }}
+      CARGO_ACTION_RELEASE: ${{ inputs.release }}
+      CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
+      CARGO_ACTION_LOCKED: ${{ inputs.locked }}
+      CARGO_ACTION_FROZEN: ${{ inputs.frozen }}
+      CARGO_ACTION_OFFLINE: ${{ inputs.offline }}
+      CARGO_ACTION_IGNORE_RUST_VERSION: ${{ inputs.ignore-rust-version }}
+      CARGO_ACTION_VERBOSE: ${{ inputs.verbose }}
+      CARGO_ACTION_QUIET: ${{ inputs.quiet }}
+      CARGO_ACTION_COLOR: ${{ inputs.color }}
+      CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
+      CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
+      CARGO_ACTION_CONFIG: ${{ inputs.config }}
+      CARGO_ACTION_FUTURE_INCOMPAT_REPORT: ${{ inputs.future-incompat-report }}
+    run: bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" build
   - name: Upload build artifact
     if: inputs.artifact == 'true'
-    uses: actions/upload-artifact@v4
+    uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
     with:
       name: ${{ inputs.artifact-name || format('cargo-build-{0}', runner.os) }}
-      path: ${{ inputs.artifact-path || format('{0}/target', inputs.working-directory) }}
+      path: ${{ inputs.artifact-path || (inputs.target-dir && format('{0}/{1}', inputs.working-directory, inputs.target-dir)) || format('{0}/target', inputs.working-directory) }}
       if-no-files-found: ${{ inputs.artifact-if-no-files-found }}
+      retention-days: ${{ inputs.artifact-retention-days }}
