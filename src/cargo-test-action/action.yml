@@ -1,0 +1,102 @@
+name: cargo test
+description: A reusable GitHub workflow for testing Rust crates and workspaces
+steps:
+  type: composite
+inputs:
+  toolchain:
+    description: Rust toolchain to use.
+    required: false
+    default: stable
+  workdir:
+    description: Directory containing Cargo.toml.
+    required: false
+    default: .
+  package:
+    description: Package to build. Empty builds according to Cargo's workspace rules.
+    required: false
+    default: ""
+  workspace:
+    description: Build all workspace packages.
+    required: false
+    default: "false"
+  features:
+    description: >
+      Space-separated Cargo feature list. Special values "default" and "all" are translated to the corresponding Cargo flags.
+    required: false
+    default: ""
+  all-features:
+    description: Enable all Cargo features.
+    required: false
+    default: "false"
+  no-default-features:
+    description: Disable default Cargo features.
+    required: false
+    default: "false"
+  all-targets:
+    description: Build all binary, library, example, integration-test and benchmark targets.
+    required: false
+    default: "false"
+  target:
+    description: Rust compilation target triple.
+    required: false
+    default: ""
+  profile:
+    description: Cargo profile, e.g. dev, release, bench, or a custom profile.
+    required: false
+    default: ""
+  release:
+    description: Build using the release profile.
+    required: false
+    default: "false"
+  locked:
+    description: Require Cargo.lock to be up to date.
+    required: false
+    default: "true"
+  frozen:
+    description: Enable Cargo frozen mode.
+    required: false
+    default: "false"
+  offline:
+    description: Enable Cargo offline mode.
+    required: false
+    default: "false"
+  verbose:
+    description: Pass --verbose to Cargo.
+    required: false
+    default: "false"
+  color:
+    description: Cargo terminal color mode.
+    required: false
+    default: always
+  extra-args:
+    description: Additional arguments passed verbatim to cargo build.
+    required: false
+    default: ""
+  cache:
+    description: Enable the repository's Rust cache action.
+    required: false
+    default: "true"
+  cache-key:
+    description: Shared cache key.
+    required: false
+    default: ""
+  cache-workspaces:
+    description: Workspace path(s) passed to cargo-cache.
+    required: false
+    default: .
+  artifact:
+    description: Upload target output as an artifact.
+    required: false
+    default: "false"
+  artifact-name:
+    description: Artifact name.
+    required: false
+    default: ""
+  artifact-path:
+    description: Path to upload when artifact=true.
+    required: false
+    default: ""
+  artifact-if-no-files-found:
+    description: upload-artifact behavior when no files exist.
+    required: false
+    default: error
