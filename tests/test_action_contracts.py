@@ -66,6 +66,12 @@ def main() -> int:
         validate_uses(ACTIONS[name], text)
 
     compile_actions = ("build", "check", "test", "bench", "clippy", "doc")
+    cache_workspace_contract = (
+        "  cache-workspaces:\n"
+        "    description: Override rust-cache workspace specifications relative to the job workspace, one specification per line. Empty uses working-directory.\n"
+        "    required: false\n"
+        "    default: ''\n"
+    )
     for name in compile_actions:
         text = texts[name]
         if not re.search(r"target:\s*\$\{\{ inputs\.target \}\}", text):
@@ -82,6 +88,10 @@ def main() -> int:
             fail(f"{name}: cache-hit composition output missing")
         if "format('cargo-{0}-{1}-{2}'" not in text:
             fail(f"{name}: shared dependency-cache key grammar missing")
+        if cache_workspace_contract not in text:
+            fail(f"{name}: cache-workspaces must default to working-directory")
+        if "workspaces: ${{ inputs.cache-workspaces || inputs.working-directory }}" not in text:
+            fail(f"{name}: derived cache workspace is not forwarded to the cache primitive")
 
     for name in ("build", "check", "clippy", "doc"):
         expected = f'bash "${{GITHUB_ACTION_PATH}}/../_shared/cargo-command.sh" {name}'
@@ -125,6 +135,8 @@ def main() -> int:
     for output in ("artifact-id", "artifact-url", "artifact-digest", "artifact-path"):
         if f"  {output}:" not in build:
             fail(f"build: {output} output missing")
+    if "64-character lowercase hexadecimal SHA-256 digest" not in build:
+        fail("build: artifact-digest representation is not documented")
     for input_name in (
         "artifact-compression-level",
         "artifact-overwrite",
@@ -177,6 +189,8 @@ def main() -> int:
     for expected in ("macos-latest", "windows-latest", "wasm32-unknown-unknown", "shellcheck@0.11.0"):
         if expected not in workflow_text:
             fail(f"CI: missing hardening lane or tool: {expected}")
+    if "^[0-9a-f]{64}$" not in workflow_text:
+        fail("CI: artifact digest is not validated as a raw SHA-256 hex digest")
 
     print("action metadata contracts: ok")
     return 0
