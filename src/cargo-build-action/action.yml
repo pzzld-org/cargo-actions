@@ -160,9 +160,9 @@ inputs:
     required: false
     default: ''
   cache-workspaces:
-    description: Cargo workspace roots passed to Swatinem/rust-cache, one workspace specification per line.
+    description: Override rust-cache workspace specifications relative to the job workspace, one specification per line. Empty uses working-directory.
     required: false
-    default: '.'
+    default: ''
   artifact:
     description: Upload build outputs with actions/upload-artifact.
     required: false
@@ -211,7 +211,7 @@ outputs:
     description: Authenticated GitHub URL for the uploaded artifact.
     value: ${{ steps.artifact.outputs.artifact-url }}
   artifact-digest:
-    description: SHA-256 digest reported by actions/upload-artifact.
+    description: 64-character lowercase hexadecimal SHA-256 digest reported by actions/upload-artifact.
     value: ${{ steps.artifact.outputs.artifact-digest }}
   artifact-path:
     description: Resolved artifact path passed to actions/upload-artifact.
@@ -233,7 +233,7 @@ runs:
       uses: $/src/setup-rust-cache
       with:
         key: ${{ inputs.cache-key || format('cargo-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
-        workspaces: ${{ inputs.cache-workspaces }}
+        workspaces: ${{ inputs.cache-workspaces || inputs.working-directory }}
 
     - name: Build
       shell: bash
