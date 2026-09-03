@@ -102,7 +102,7 @@ jobs:
           case "${CACHE_HIT}" in true|false) ;; *) echo "invalid cache-hit output: ${CACHE_HIT}" >&2; exit 1 ;; esac
           [[ -n "${ARTIFACT_ID}" ]]
           [[ -n "${ARTIFACT_URL}" ]]
-          [[ "${ARTIFACT_DIGEST}" == sha256:* ]]
+          [[ "${ARTIFACT_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
           [[ "${ARTIFACT_PATH}" == "${EXPECTED_ARTIFACT_PATH}" ]]
 
       - name: Check
