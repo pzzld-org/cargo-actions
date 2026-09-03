@@ -7,17 +7,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 THRESHOLD = 1.0
 
+DERIVED_CACHE_WORKSPACE = "workspaces: ${{ inputs.cache-workspaces || inputs.working-directory }}"
+
 CHECKS = {
     "src/cargo-build-action/action.yml": (
         "author: pzzld-org",
         "uses: $/src/setup-rust-cache",
+        DERIVED_CACHE_WORKSPACE,
         "artifact-digest:",
+        "64-character lowercase hexadecimal SHA-256 digest",
         "artifact-compression-level:",
         "_shared/resolve-artifact-path.sh",
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
     ),
     "src/cargo-check-action/action.yml": (
         "uses: $/src/setup-rust-cache",
+        DERIVED_CACHE_WORKSPACE,
         "cache-hit:",
         'cargo-command.sh" check',
     ),
@@ -26,6 +31,7 @@ CHECKS = {
         "default: '0.9.143'",
         "taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4",
         "fallback: cargo-binstall",
+        DERIVED_CACHE_WORKSPACE,
         "nextest-no-tests:",
         'cargo-command.sh" test',
     ),
@@ -34,6 +40,7 @@ CHECKS = {
         "default: '1.1.0'",
         "taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4",
         "fallback: cargo-binstall",
+        DERIVED_CACHE_WORKSPACE,
         "criterion-message-format:",
         'cargo-command.sh" bench',
     ),
@@ -42,11 +49,13 @@ CHECKS = {
         "deny-warnings:",
         "clippy-args:",
         "uses: $/src/setup-rust-cache",
+        DERIVED_CACHE_WORKSPACE,
     ),
     "src/cargo-doc-action/action.yml": (
         "document-private-items:",
         "no-deps:",
         "uses: $/src/setup-rust-cache",
+        DERIVED_CACHE_WORKSPACE,
     ),
     "src/cargo-fmt-action/action.yml": (
         "components: rustfmt",
@@ -86,6 +95,7 @@ CHECKS = {
         "windows-latest",
         "wasm32-unknown-unknown",
         "Validate build outputs",
+        "^[0-9a-f]{64}$",
     ),
 }
 
