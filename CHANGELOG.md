@@ -25,10 +25,13 @@
 - `taiki-e/install-action` is pinned to v2.87.4 (`e67fa11c4b9316fa714ddf0abed07a0c3143b95b`) with `cargo-binstall` as the explicit fallback.
 - Compile actions now compose one canonical cache primitive through `$/src/setup-rust-cache` instead of duplicating cache implementation details.
 - Default dependency-cache keys are shared across compatible Cargo commands and partitioned by OS, toolchain, and target.
+- Compile-action dependency caching now defaults to each action's `working-directory`; explicit `cache-workspaces` values remain native rust-cache specifications relative to the job workspace.
 - Public action metadata uses block-style mappings and explicit author/output contracts for reviewable API diffs.
 - Boolean inputs now accept exactly `true` or `false`; ambiguous shell truthy spellings are rejected.
+- Build artifact digests are documented and smoke-tested as the raw 64-character lowercase hexadecimal SHA-256 value returned by `actions/upload-artifact`.
 
 ### Fixed
 
 - Absolute `target-dir` values are no longer incorrectly prefixed with `working-directory` when used as the default artifact upload path.
 - Nextest `nextest-no-tests` documents and validates the actual `fail`, `warn`, and `pass` values.
+- Non-root Cargo projects no longer cause rust-cache metadata discovery to run against the repository root and fall back to an empty lockfile/environment hash.
