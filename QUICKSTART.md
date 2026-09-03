@@ -98,7 +98,7 @@ with:
   run: printf '%s %s\n' "$ARTIFACT_ID" "$ARTIFACT_DIGEST"
 ```
 
-Relative artifact paths resolve from `working-directory`. Absolute Unix, Windows drive, and UNC paths are preserved.
+Relative artifact paths resolve from `working-directory`. Absolute Unix, Windows drive, and UNC paths are preserved. `artifact-digest` is a raw 64-character lowercase hexadecimal SHA-256 value.
 
 ## Build a matrix
 
@@ -178,7 +178,11 @@ No action shell-evaluates these values.
 
 ## Cache behavior
 
-Integrated caching is enabled by default and shared across compatible Cargo commands for the same OS, toolchain, and target. Disable it when the surrounding job owns caching:
+Integrated caching is enabled by default and shared across compatible Cargo commands for the same OS, toolchain, and target. The default dependency-cache workspace follows `working-directory`, so a project below the repository root is hashed and restored against the correct Cargo metadata and lockfile.
+
+Use `cache-workspaces` only to override that default. Explicit values use `Swatinem/rust-cache` workspace syntax, are relative to the job workspace, and may contain one specification per line.
+
+Disable integrated caching when the surrounding job owns caching:
 
 ```yaml
 with:
