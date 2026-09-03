@@ -39,7 +39,7 @@ jobs:
 
       - name: Lint shell
         shell: bash
-        run: shellcheck src/_shared/*.sh tests/*.sh
+        run: shellcheck -x src/_shared/*.sh tests/*.sh
 
       - name: Exercise Cargo command grammar
         shell: bash
