@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-is_true() {
-  case "${1:-false}" in
-    1|true|TRUE|yes|YES|on|ON) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+readonly SHARED_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "${SHARED_DIR}/lib.sh"
 
-append_lines() {
-  local flag="$1"
-  local values="${2:-}"
-  local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" ]] && continue
-    args+=("$flag" "$line")
-  done <<< "$values"
-}
+validate_common_inputs
+require_uint_if_set nextest-retries "${NEXTEST_ACTION_RETRIES:-}"
+require_enum_if_set nextest-run-ignored "${NEXTEST_ACTION_RUN_IGNORED:-}" default only all
+require_enum_if_set nextest-no-tests "${NEXTEST_ACTION_NO_TESTS:-}" fail warn pass
 
-append_raw_lines() {
-  local values="${1:-}"
-  local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" ]] && continue
-    args+=("$line")
-  done <<< "$values"
-}
+if [[ -n "${NEXTEST_ACTION_TEST_THREADS:-}" ]] \
+  && [[ "${NEXTEST_ACTION_TEST_THREADS}" != "num-cpus" ]] \
+  && ! [[ "${NEXTEST_ACTION_TEST_THREADS}" =~ ^-?[1-9][0-9]*$ ]]; then
+  cargo_actions_die "nextest-test-threads must be num-cpus or a non-zero integer (got: ${NEXTEST_ACTION_TEST_THREADS})"
+fi
+
+if is_true "${CARGO_ACTION_KEEP_GOING:-false}"; then
+  cargo_actions_die "keep-going is not supported by cargo nextest run; use no-fail-fast instead"
+fi
+if is_true "${CARGO_ACTION_FUTURE_INCOMPAT_REPORT:-false}"; then
+  cargo_actions_die "future-incompat-report is not supported by cargo nextest run"
+fi
+if is_true "${CARGO_ACTION_QUIET:-false}"; then
+  cargo_actions_die "quiet=true is not supported by cargo nextest run"
+fi
 
 args=(nextest run)
 
@@ -45,12 +44,8 @@ append_lines --bench "${CARGO_ACTION_BENCH:-}"
 if is_true "${CARGO_ACTION_BENCHES:-false}"; then args+=(--benches); fi
 if is_true "${CARGO_ACTION_ALL_TARGETS:-false}"; then args+=(--all-targets); fi
 
-if is_true "${CARGO_ACTION_ALL_FEATURES:-false}"; then
-  args+=(--all-features)
-fi
-if is_true "${CARGO_ACTION_NO_DEFAULT_FEATURES:-false}"; then
-  args+=(--no-default-features)
-fi
+if is_true "${CARGO_ACTION_ALL_FEATURES:-false}"; then args+=(--all-features); fi
+if is_true "${CARGO_ACTION_NO_DEFAULT_FEATURES:-false}"; then args+=(--no-default-features); fi
 case "${CARGO_ACTION_FEATURES:-}" in
   ""|default) ;;
   all)
@@ -60,10 +55,6 @@ case "${CARGO_ACTION_FEATURES:-}" in
 esac
 
 if [[ -n "${CARGO_ACTION_JOBS:-}" ]]; then args+=(--build-jobs "${CARGO_ACTION_JOBS}"); fi
-if is_true "${CARGO_ACTION_RELEASE:-false}" && [[ -n "${CARGO_ACTION_PROFILE:-}" ]]; then
-  printf 'cargo-actions: release=true and profile=%s are mutually exclusive\n' "${CARGO_ACTION_PROFILE}" >&2
-  exit 2
-fi
 if is_true "${CARGO_ACTION_RELEASE:-false}"; then
   args+=(--release)
 elif [[ -n "${CARGO_ACTION_PROFILE:-}" ]]; then
@@ -79,14 +70,6 @@ if is_true "${CARGO_ACTION_OFFLINE:-false}"; then args+=(--offline); fi
 if is_true "${CARGO_ACTION_IGNORE_RUST_VERSION:-false}"; then args+=(--ignore-rust-version); fi
 append_lines --config "${CARGO_ACTION_CONFIG:-}"
 
-if is_true "${CARGO_ACTION_FUTURE_INCOMPAT_REPORT:-false}"; then
-  printf 'cargo-actions: future-incompat-report is not supported by cargo nextest run\n' >&2
-  exit 2
-fi
-if is_true "${CARGO_ACTION_QUIET:-false}"; then
-  printf 'cargo-actions: quiet=true is not supported by cargo nextest run\n' >&2
-  exit 2
-fi
 if is_true "${CARGO_ACTION_VERBOSE:-false}"; then args+=(--verbose); fi
 if [[ -n "${CARGO_ACTION_COLOR:-always}" ]]; then args+=(--color "${CARGO_ACTION_COLOR:-always}"); fi
 if [[ -n "${CARGO_ACTION_MESSAGE_FORMAT:-}" ]]; then args+=(--cargo-message-format "${CARGO_ACTION_MESSAGE_FORMAT}"); fi

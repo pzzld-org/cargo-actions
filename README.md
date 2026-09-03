@@ -2,26 +2,26 @@
 
 Composable GitHub Actions for Cargo workflows.
 
-The repository separates Cargo execution from CI orchestration. A caller-owned `rust.yml` decides the operating-system matrix, feature matrix, targets, and policy. Each action executes one Cargo operation without inventing a project-specific matrix.
+`cargo-actions` separates Cargo execution from CI orchestration. Caller workflows own matrices, event policy, permissions, checkout/ref trust, and repository-specific staging. Each public action owns one Rust operation and exposes a stable step-level contract.
 
 ## Actions
 
-| Action | Purpose |
+| Action | Default execution |
 | --- | --- |
-| `src/cargo-build-action` | `cargo build`, including package/workspace selection, targets, features, profiles, lock/network modes, custom Cargo config, caching, and optional artifact upload |
-| `src/cargo-check-action` | `cargo check` using the same Cargo selection grammar |
-| `src/cargo-test-action` | `cargo nextest run` by default, with `cargo test` as an explicit fallback |
-| `src/cargo-bench-action` | `cargo criterion` by default, with `cargo bench` as an explicit fallback |
-| `src/cargo-clippy-action` | `cargo clippy` with the shared grammar, `--no-deps`, lint forwarding, and optional `-D warnings` |
-| `src/cargo-doc-action` | `cargo doc` with dependency/private-item controls |
-| `src/cargo-fmt-action` | `cargo fmt`, workspace/package selection, and check mode |
-| `src/setup-rust-cache` | Standalone sccache plus Rust dependency cache setup |
+| `src/cargo-build-action` | `cargo build`, shared cache, optional artifact upload |
+| `src/cargo-check-action` | `cargo check` |
+| `src/cargo-test-action` | `cargo nextest run`; `runner: cargo` selects `cargo test` |
+| `src/cargo-bench-action` | `cargo criterion`; `runner: cargo` selects `cargo bench` |
+| `src/cargo-clippy-action` | `cargo clippy` |
+| `src/cargo-doc-action` | `cargo doc` |
+| `src/cargo-fmt-action` | `cargo fmt --all --check` |
+| `src/setup-rust-cache` | sccache plus Cargo dependency caching |
 
-## Design contract
+## Contract
 
-### `rust.yml` owns orchestration
+### Orchestration stays with the caller
 
-Do not encode feature or operating-system matrices inside these actions. The caller should describe concrete build configurations:
+Do not encode project matrices in these actions. Model concrete CI legs in the caller:
 
 ```yaml
 strategy:
@@ -39,79 +39,38 @@ strategy:
         features: default
 ```
 
-Then execute one matrix leg:
+Then execute one contract per leg:
 
 ```yaml
 - name: Build
   uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
   with:
-    workspace: "true"
-    all-targets: "true"
+    workspace: 'true'
+    all-targets: 'true'
     features: ${{ matrix.features }}
-    cache-key: build-${{ matrix.id }}
 ```
 
-This keeps repository policy in the repository and Cargo mechanics in `cargo-actions`.
-
-### Runner defaults
-
-`cargo-test-action` defaults to `runner: nextest`. `cargo-bench-action` defaults to `runner: criterion`.
-
-Both tool runners are installed with the SHA-pinned `taiki-e/install-action`. Its fallback is explicitly set to `cargo-binstall`, avoiding source recompilation when a binary installation path is available.
-
-Use the Cargo fallback explicitly when a project requires behavior not supported by the enhanced runner:
+Repository-specific behavior remains outside the action:
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+- name: Build
+  uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
   with:
-    runner: cargo
+    package: shepherd-cli
 
-- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
-  with:
-    runner: cargo
+- name: Stage Shepherd harness carriers
+  run: scripts/stage-harness-carriers.sh "$PWD"
 ```
 
-### Nextest
+### Pin the action ref deliberately
 
-The default test runner preserves the package, workspace, target, feature, target-triple, lock/network, filter, `--no-run`, and trailing-argument contracts from the Cargo test action.
+For security-sensitive consumers, pin `pzzld-org/cargo-actions` to an immutable commit SHA. Version tags are appropriate when the caller intentionally follows a maintained release line. The third-party actions used inside this repository are pinned to full commit SHAs and annotated with their audited release versions.
 
-It also exposes nextest-native controls:
+### Inputs are strings
 
-- `nextest-profile`
-- `nextest-retries`
-- `nextest-test-threads`
-- `nextest-filterset`
-- `nextest-partition`
-- `nextest-run-ignored`
-- `nextest-no-tests`
+GitHub composite-action inputs are strings. Boolean inputs therefore accept exactly `true` or `false`. Values such as `yes`, `1`, or `on` are rejected instead of being interpreted differently by a shell step and an Actions expression.
 
-`jobs` maps to nextest's build parallelism (`--build-jobs`). `profile` maps to `--cargo-profile`.
-
-### Criterion
-
-The default benchmark runner uses `cargo-criterion`, not a renamed `cargo bench` invocation. The project must still define compatible benchmark targets in its own `Cargo.toml`.
-
-Criterion-native controls include:
-
-- `criterion-manifest-path`
-- `criterion-output-format`
-- `criterion-plotting-backend`
-- `criterion-message-format`
-- `criterion-history-id`
-- `criterion-history-description`
-- `criterion-debug`
-
-`cargo-criterion` uses the benchmark profile by default. If a workflow needs a custom Cargo profile, `--config`, `--ignore-rust-version`, or Cargo-specific message formatting, use `runner: cargo`.
-
-### Shared command grammars
-
-Build-like actions use `src/_shared/cargo-command.sh`. Nextest and Criterion have dedicated deterministic argv builders in `src/_shared/nextest-command.sh` and `src/_shared/criterion-command.sh` because their command-line grammars differ from Cargo in material ways.
-
-All scripts construct argv arrays and invoke Cargo directly. Caller input is never passed through `eval`.
-
-Inputs that may repeat, such as `packages`, `exclude`, `bin`, `example`, `test`, `bench`, `config`, `extra-args`, filtersets, and harness/lint arguments, use one complete argument or value per line.
-
-Example:
+Repeated values and escape-hatch arguments are newline-delimited. Each non-empty line is one complete argv element:
 
 ```yaml
 with:
@@ -121,43 +80,132 @@ with:
     net.retry=2
 ```
 
-A line containing spaces remains one argument. Shell quoting is not re-evaluated.
+A line containing spaces remains one argument. Caller input is never shell-evaluated.
 
-### Feature behavior
+### Shared Cargo grammar
 
-`features` follows Cargo's normal feature syntax, with two convenience values:
+`src/_shared/cargo-command.sh` implements the Cargo-native grammar. Nextest and cargo-criterion use dedicated argv builders because their interfaces are similar to Cargo but not identical. `src/_shared/lib.sh` owns shared parsing and validation.
 
-- empty or `default`: do not add a feature-selection flag.
-- `all`: add `--all-features`.
+The public compile actions consistently expose package/workspace selection, target selection, features, target triples, profiles, lock/network modes, output controls, Cargo configuration, caching, and newline-delimited escape hatches where the underlying runner supports them. Unsupported runner/input combinations fail with an explicit error instead of silently dropping flags.
+
+### Feature selection
+
+`features` follows Cargo feature syntax with two convenience values:
+
+- empty or `default`: preserve normal Cargo defaults;
+- `all`: map to `--all-features`.
 
 `all-features` and `no-default-features` remain available as explicit booleans.
 
-### Toolchains and targets
+## Test runner
 
-Every compile action installs the requested toolchain. When `target` is non-empty, it is also passed to `actions-rust-lang/setup-rust-toolchain`, so a cross-target build does not assume the target is preinstalled.
+`cargo-test-action` defaults to cargo-nextest `0.9.143`, the version exercised by this repository's smoke matrix. Override `nextest-version` deliberately, including `latest` when following upstream latest is desired.
 
-`cargo-clippy-action` installs the `clippy` component. `cargo-fmt-action` installs `rustfmt`.
+Installation uses SHA-pinned `taiki-e/install-action`. The installer can consume nextest's published binaries directly and has `cargo-binstall` configured as its explicit fallback.
 
-### Cache behavior
+Nextest-specific inputs include:
 
-Compile actions use the same two cache layers:
+- `nextest-profile`
+- `nextest-retries`
+- `nextest-test-threads`
+- `nextest-filterset`
+- `nextest-partition`
+- `nextest-run-ignored` (`default`, `only`, `all`)
+- `nextest-no-tests` (`fail`, `warn`, `pass`)
 
-1. `mozilla-actions/sccache-action`
-2. `Swatinem/rust-cache` with `cache-targets: false`
+`jobs` maps to nextest `--build-jobs`; `profile` maps to `--cargo-profile`. `runner: cargo` restores standard `cargo test` semantics.
 
-The Cargo actions repeat those pinned setup steps intentionally. A nested composite action reference such as `uses: ./src/setup-rust-cache` would resolve against the caller workspace when consumed from another repository. Keeping the public actions self-contained avoids that external-consumption failure mode.
+```yaml
+- name: Test
+  uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+  with:
+    workspace: 'true'
+    nextest-profile: ci
+    nextest-retries: '2'
+```
 
-Set `cache: "false"` when a job owns caching separately. Test and bench cache keys include the selected runner so Cargo, nextest, and Criterion lanes do not collide.
+## Benchmark runner
 
-### Escape hatch
+`cargo-bench-action` defaults to cargo-criterion `1.1.0`, installed through SHA-pinned `taiki-e/install-action` with `cargo-binstall` fallback. The project still owns its benchmark definitions and Criterion dependencies.
 
-The stable interface promotes common flags to named inputs. `extra-args` covers less-common or newly added runner flags without requiring an action release.
+Criterion-specific inputs include:
 
-Unlike a raw command string, `extra-args` is not shell-evaluated. Supply one argument per line.
+- `criterion-manifest-path`
+- `criterion-output-format` (`criterion`, `quiet`, `verbose`, `bencher`)
+- `criterion-plotting-backend` (`gnuplot`, `plotters`, `disabled`)
+- `criterion-message-format` (`json`, `openmetrics`)
+- `criterion-history-id`
+- `criterion-history-description`
+- `criterion-debug`
 
-## Canonical Rust workflow
+cargo-criterion uses Cargo's benchmark profile by default. Select `runner: cargo` when a workflow requires a custom Cargo profile, Cargo `--config`, `--ignore-rust-version`, or Cargo-native message formatting.
 
-A repository can keep a single `.github/workflows/rust.yml`:
+```yaml
+- name: Bench
+  uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+  with:
+    no-run: 'true'
+    criterion-plotting-backend: plotters
+```
+
+## Toolchains and targets
+
+Every compile action installs the requested Rust toolchain. A non-empty `target` is also installed before Cargo runs. Clippy installs the `clippy` component and format installs `rustfmt`.
+
+```yaml
+- name: Build WASM
+  uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
+  with:
+    package: my-component
+    target: wasm32-wasip2
+```
+
+The repository CI independently smoke-tests `wasm32-unknown-unknown` so target installation is part of the action contract, not an assumption about hosted-runner state.
+
+## Cache model
+
+Compile actions compose `src/setup-rust-cache` through GitHub's same-repository `$/src/setup-rust-cache` reference. The reference resolves against the repository and revision of the running action, so consumers do not need to check out `cargo-actions` separately and the cache implementation cannot accidentally resolve against the caller workspace.
+
+The cache primitive uses:
+
+1. `mozilla-actions/sccache-action` for compiler caching;
+2. `Swatinem/rust-cache` with `cache-targets: false` for dependency caching.
+
+Default dependency-cache keys are shared across compatible Cargo operations and derive from operating system, toolchain, and target. Set `cache-key` when a caller needs an additional partition. Every compile action exposes `cache-hit` for downstream composition.
+
+`$/...` same-repository action references are supported on GitHub.com. GitHub Enterprise Server does not currently support this reference form; GHES consumers need a compatibility release that uses a different composition strategy.
+
+## Build artifacts
+
+`cargo-build-action` can upload outputs through pinned `actions/upload-artifact`.
+
+```yaml
+- name: Build
+  id: build
+  uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
+  with:
+    release: 'true'
+    artifact: 'true'
+    artifact-name: binaries
+    artifact-path: target/release/my-app
+    artifact-retention-days: '7'
+    artifact-compression-level: '0'
+
+- name: Record artifact digest
+  run: echo '${{ steps.build.outputs.artifact-digest }}'
+```
+
+Artifact controls expose `if-no-files-found`, retention, compression, overwrite, hidden-file inclusion, and archive behavior. Relative `artifact-path` and `target-dir` values resolve from `working-directory`; Unix absolute paths, Windows drive paths, and UNC paths are preserved.
+
+Build outputs:
+
+- `cache-hit`
+- `artifact-id`
+- `artifact-url`
+- `artifact-digest`
+- `artifact-path`
+
+## CI example
 
 ```yaml
 name: Rust
@@ -189,66 +237,40 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build
         uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
         with:
-          workspace: "true"
-          all-targets: "true"
-          locked: "true"
+          workspace: 'true'
+          all-targets: 'true'
           features: ${{ matrix.features }}
-          cache-key: build-${{ matrix.id }}
 
   test:
-    name: nextest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Test
+      - name: Nextest
         uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
         with:
-          workspace: "true"
-          locked: "true"
+          workspace: 'true'
           nextest-profile: ci
-
-  bench:
-    name: criterion
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - name: Bench
-        uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
-        with:
-          workspace: "true"
-          locked: "true"
 ```
 
-Repository-specific work remains outside the generic Cargo action:
+## Verification
 
-```yaml
-- name: Build
-  uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
-  with:
-    package: shepherd-cli
+The repository gates changes through deterministic checks before hosted-runner smoke tests:
 
-- name: Stage Shepherd harness carriers
-  run: scripts/stage-harness-carriers.sh "$PWD"
-```
+- semantic action-manifest schema validation;
+- `bash -n` and ShellCheck for shared/test shell code;
+- exact argv regression tests for Cargo, nextest, and cargo-criterion;
+- cross-platform artifact-path tests;
+- metadata and supply-chain contract tests;
+- deterministic public-surface eval with a 1.0 pass threshold;
+- Ubuntu, macOS, and Windows smoke jobs;
+- artifact upload/output verification;
+- independent WASM target installation/build verification.
 
-## Validation
-
-The repository ships three validation layers:
-
-- `tests/test-cargo-command.sh` executes the shared Cargo grammar against a fake Cargo binary and compares exact argv.
-- `tests/test-tool-runners.sh` does the same for nextest and Criterion.
-- `tests/test_action_contracts.py` checks public metadata contracts, runner defaults, pinned third-party actions, cargo-binstall fallback, cross-repository path safety, component/target setup, and forwarding behavior.
-- `evals/eval_action_surface.py` scores the intended public surface and requires full coverage.
-
-`.github/workflows/ci.yml` runs those contracts and then smoke-tests the action family on Linux and Windows. The smoke lane exercises the default nextest and Criterion paths plus the explicit Cargo fallbacks.
-
-See [QUICKSTART.md](QUICKSTART.md) for copy-paste examples.
+See [QUICKSTART.md](QUICKSTART.md) for focused examples.

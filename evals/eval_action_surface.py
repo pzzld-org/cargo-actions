@@ -5,51 +5,98 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = {
-    "cargo-build-action": ("build", "target", "features", "artifact"),
-    "cargo-check-action": ("check", "target", "features", "cache"),
-    "cargo-test-action": ("runner", "default: nextest", "cargo-nextest", "nextest-profile", "test-args", 'cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test'),
-    "cargo-bench-action": ("runner", "default: criterion", "cargo-criterion", "criterion-output-format", "bench-args", 'cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" bench'),
-    "cargo-clippy-action": ("clippy", "clippy-args", "deny-warnings", "no-deps"),
-    "cargo-doc-action": ("doc", "document-private-items", "no-deps", "target"),
-    "cargo-fmt-action": ("fmt", "check", "workspace", "rustfmt"),
-}
-
 THRESHOLD = 1.0
+
+CHECKS = {
+    "src/cargo-build-action/action.yml": (
+        "author: pzzld-org",
+        "uses: $/src/setup-rust-cache",
+        "artifact-digest:",
+        "artifact-compression-level:",
+        "_shared/resolve-artifact-path.sh",
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    ),
+    "src/cargo-check-action/action.yml": (
+        "uses: $/src/setup-rust-cache",
+        "cache-hit:",
+        'cargo-command.sh" check',
+    ),
+    "src/cargo-test-action/action.yml": (
+        "default: nextest",
+        "default: '0.9.143'",
+        "taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4",
+        "fallback: cargo-binstall",
+        "nextest-no-tests:",
+        'cargo-command.sh" test',
+    ),
+    "src/cargo-bench-action/action.yml": (
+        "default: criterion",
+        "default: '1.1.0'",
+        "taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4",
+        "fallback: cargo-binstall",
+        "criterion-message-format:",
+        'cargo-command.sh" bench',
+    ),
+    "src/cargo-clippy-action/action.yml": (
+        "components: clippy",
+        "deny-warnings:",
+        "clippy-args:",
+        "uses: $/src/setup-rust-cache",
+    ),
+    "src/cargo-doc-action/action.yml": (
+        "document-private-items:",
+        "no-deps:",
+        "uses: $/src/setup-rust-cache",
+    ),
+    "src/cargo-fmt-action/action.yml": (
+        "components: rustfmt",
+        "default: 'true'",
+        'cargo-command.sh" fmt',
+    ),
+    "src/setup-rust-cache/action.yml": (
+        "steps.rust-cache.outputs.cache-hit",
+        "cache key must not be empty",
+        "sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11",
+        "rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2",
+    ),
+    "src/_shared/lib.sh": (
+        "require_bool",
+        "require_enum",
+        "require_uint_range",
+        "validate_common_inputs",
+    ),
+    "src/_shared/nextest-command.sh": (
+        "require_enum_if_set nextest-no-tests",
+        "fail warn pass",
+        "args=(nextest run)",
+    ),
+    "src/_shared/criterion-command.sh": (
+        "require_enum criterion-output-format",
+        "criterion quiet verbose bencher",
+        "args=(criterion)",
+    ),
+    "src/_shared/resolve-artifact-path.sh": (
+        "CARGO_ACTION_WORKING_DIRECTORY",
+        "CARGO_ACTION_ARTIFACT_PATH",
+        "CARGO_ACTION_TARGET_DIR",
+    ),
+    ".github/workflows/ci.yml": (
+        "shellcheck@0.11.0",
+        "macos-latest",
+        "windows-latest",
+        "wasm32-unknown-unknown",
+        "Validate build outputs",
+    ),
+}
 
 
 def main() -> int:
     checks: list[dict[str, object]] = []
-
-    for directory, needles in EXPECTED.items():
-        path = ROOT / "src" / directory / "action.yml"
+    for relative, needles in CHECKS.items():
+        path = ROOT / relative
         text = path.read_text() if path.is_file() else ""
         for needle in needles:
-            checks.append({"action": directory, "criterion": needle, "passed": needle in text})
-
-    shared_checks = {
-        "cargo-command.sh": (
-            "append_common_package_args",
-            "append_common_target_args",
-            "append_common_feature_args",
-            'exec cargo "${args[@]}"',
-        ),
-        "nextest-command.sh": ("args=(nextest run)", "--build-jobs", "--filterset", 'exec cargo "${args[@]}"'),
-        "criterion-command.sh": ("args=(criterion)", "--output-format", "--criterion-manifest-path", 'exec cargo "${args[@]}"'),
-    }
-    for filename, needles in shared_checks.items():
-        path = ROOT / "src/_shared" / filename
-        text = path.read_text() if path.is_file() else ""
-        for needle in needles:
-            checks.append({"action": f"_shared/{filename}", "criterion": needle, "passed": needle in text})
-
-    for directory in ("cargo-test-action", "cargo-bench-action"):
-        text = (ROOT / "src" / directory / "action.yml").read_text()
-        for needle in (
-            "taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf",
-            "fallback: cargo-binstall",
-        ):
-            checks.append({"action": directory, "criterion": needle, "passed": needle in text})
+            checks.append({"artifact": relative, "criterion": needle, "passed": needle in text})
 
     passed = sum(bool(check["passed"]) for check in checks)
     score = passed / len(checks)

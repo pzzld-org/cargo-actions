@@ -4,89 +4,103 @@
 
 ```yaml
 - name: Checkout
-  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
 - name: Build
   uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
   with:
-    workspace: "true"
-    all-targets: "true"
-    locked: "true"
+    workspace: 'true'
+    all-targets: 'true'
+    locked: 'true'
 ```
 
-## Test with nextest (default)
+All boolean inputs are exact strings: `true` or `false`.
+
+## Test with nextest
+
+Nextest is the default runner. The tested default version is `0.9.143`.
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
+- name: Test
+  uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
   with:
-    workspace: "true"
+    workspace: 'true'
     nextest-profile: ci
-    nextest-retries: "2"
+    nextest-retries: '2'
+    nextest-no-tests: fail
 ```
 
-The action installs `cargo-nextest` through the pinned `taiki-e/install-action`, with `cargo-binstall` configured as its fallback installation path.
-
-Use nextest-native filtersets when useful:
+The action uses pinned `taiki-e/install-action` and explicitly enables `cargo-binstall` fallback. To opt into upstream latest rather than the tested version:
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
-  with:
-    nextest-filterset: |
-      package(core) & not test(slow)
-      package(cli)
-    nextest-test-threads: num-cpus
+with:
+  nextest-version: latest
 ```
 
-Test-name filters and libtest-compatible arguments after `--` remain available:
+Filtersets remain separate from the optional positional test-name filter:
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
-  with:
-    filter: parser
-    test-args: |
-      --nocapture
-      --exact
+with:
+  nextest-filterset: |
+    package(core) & not test(slow)
+    package(cli)
+  nextest-test-threads: num-cpus
 ```
 
-To use standard Cargo instead:
+Use standard Cargo when its test runner semantics are required:
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-test-action@v0.0.0
-  with:
-    runner: cargo
-    workspace: "true"
+with:
+  runner: cargo
+  test-args: |
+    --nocapture
+    --test-threads=1
 ```
 
-## Benchmark with Criterion (default)
+## Benchmark with cargo-criterion
 
-Projects define their Criterion-compatible benchmark targets in `Cargo.toml`; the action installs and runs `cargo-criterion` by default.
+cargo-criterion is the default benchmark runner. The tested default version is `1.1.0`.
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+- name: Bench
+  uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
   with:
-    workspace: "true"
+    no-run: 'true'
     criterion-output-format: criterion
     criterion-plotting-backend: plotters
 ```
 
-Compile without executing benchmarks:
+Use standard `cargo bench` when you need Cargo-only controls:
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
-  with:
-    no-run: "true"
+with:
+  runner: cargo
+  profile: ci-bench
 ```
 
-Use standard `cargo bench` when you need Cargo-specific benchmark behavior such as a custom Cargo profile or raw Cargo configuration overrides:
+## Upload build artifacts
 
 ```yaml
-- uses: pzzld-org/cargo-actions/src/cargo-bench-action@v0.0.0
+- name: Build
+  id: build
+  uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
   with:
-    runner: cargo
-    profile: ci-bench
+    release: 'true'
+    artifact: 'true'
+    artifact-path: target/release/my-app
+    artifact-retention-days: '3'
+    artifact-compression-level: '0'
+
+- name: Use artifact metadata
+  env:
+    ARTIFACT_ID: ${{ steps.build.outputs.artifact-id }}
+    ARTIFACT_DIGEST: ${{ steps.build.outputs.artifact-digest }}
+  run: printf '%s %s\n' "$ARTIFACT_ID" "$ARTIFACT_DIGEST"
 ```
 
-## Build a feature matrix
+Relative artifact paths resolve from `working-directory`. Absolute Unix, Windows drive, and UNC paths are preserved.
+
+## Build a matrix
 
 ```yaml
 jobs:
@@ -107,36 +121,36 @@ jobs:
             features: default
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
         with:
-          workspace: "true"
-          all-targets: "true"
+          workspace: 'true'
+          all-targets: 'true'
           features: ${{ matrix.features }}
-          cache-key: build-${{ matrix.id }}
 ```
+
+The caller owns the matrix. The Cargo action only executes the selected leg.
 
 ## Cross-compile
 
 ```yaml
 - uses: pzzld-org/cargo-actions/src/cargo-build-action@v0.0.0
   with:
-    target: wasm32-wasip2
     package: my-component
+    target: wasm32-wasip2
 ```
 
-The target is installed with the requested Rust toolchain before Cargo runs.
+The action installs the requested target before Cargo runs.
 
 ## Clippy
 
 ```yaml
 - uses: pzzld-org/cargo-actions/src/cargo-clippy-action@v0.0.0
   with:
-    workspace: "true"
-    all-targets: "true"
-    all-features: "true"
-    deny-warnings: "true"
+    workspace: 'true'
+    all-targets: 'true'
+    all-features: 'true'
+    deny-warnings: 'true'
 ```
 
 ## Format
@@ -144,36 +158,33 @@ The target is installed with the requested Rust toolchain before Cargo runs.
 ```yaml
 - uses: pzzld-org/cargo-actions/src/cargo-fmt-action@v0.0.0
   with:
-    workspace: "true"
-    check: "true"
+    workspace: 'true'
+    check: 'true'
 ```
 
-## Additional runner arguments
+## Repeated and escape-hatch arguments
 
-Repeated or escape-hatch values use one complete value per line:
+One non-empty line equals one argv element:
 
 ```yaml
 with:
   extra-args: |
     --timings
-```
-
-Cargo-native actions can also use configuration overrides:
-
-```yaml
-with:
-  config: |
+    --config
     net.retry=2
-    build.incremental=false
 ```
 
-No runner shell-evaluates these values.
+No action shell-evaluates these values.
 
-## Disable integrated caching
+## Cache behavior
+
+Integrated caching is enabled by default and shared across compatible Cargo commands for the same OS, toolchain, and target. Disable it when the surrounding job owns caching:
 
 ```yaml
 with:
-  cache: "false"
+  cache: 'false'
 ```
 
-Use this when the surrounding job has already established its own cache strategy.
+Compile actions expose `cache-hit` for downstream steps.
+
+The public compile actions use GitHub's `$/src/setup-rust-cache` same-repository reference. This composition model targets GitHub.com; GitHub Enterprise Server does not currently support `$/...` action references.

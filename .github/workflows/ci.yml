@@ -8,29 +8,54 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contracts:
     name: action contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Validate action YAML
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ShellCheck
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+        with:
+          tool: shellcheck@0.11.0
+          fallback: none
+
+      - name: Validate action manifests
         run: ruby tests/test-action-yaml.rb
-      - name: Validate shared shell
+
+      - name: Validate shell syntax
         shell: bash
         run: |
-          bash -n src/_shared/cargo-command.sh
-          bash -n src/_shared/nextest-command.sh
-          bash -n src/_shared/criterion-command.sh
+          for script in src/_shared/*.sh tests/*.sh; do
+            bash -n "$script"
+          done
+
+      - name: Lint shell
+        shell: bash
+        run: shellcheck src/_shared/*.sh tests/*.sh
+
       - name: Exercise Cargo command grammar
         shell: bash
         run: bash tests/test-cargo-command.sh
+
       - name: Exercise tool runner grammar
         shell: bash
         run: bash tests/test-tool-runners.sh
+
+      - name: Exercise artifact path grammar
+        shell: bash
+        run: bash tests/test-artifact-path.sh
+
       - name: Validate action metadata contracts
         run: python3 tests/test_action_contracts.py
+
       - name: Evaluate public action surface
         run: python3 evals/eval_action_surface.py
 
@@ -38,64 +63,116 @@ jobs:
     name: smoke (${{ matrix.os }})
     needs: contracts
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Build
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build and upload artifact
+        id: build
         uses: ./src/cargo-build-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          all-targets: "true"
+          all-targets: 'true'
           features: full
+          target-dir: ${{ runner.temp }}/cargo-actions-target
           cache-key: smoke-${{ runner.os }}
+          artifact: 'true'
+          artifact-name: cargo-actions-smoke-${{ runner.os }}
+          artifact-retention-days: '1'
+          artifact-compression-level: '0'
+
+      - name: Validate build outputs
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.build.outputs.cache-hit }}
+          ARTIFACT_ID: ${{ steps.build.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.build.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.build.outputs.artifact-digest }}
+          ARTIFACT_PATH: ${{ steps.build.outputs.artifact-path }}
+          EXPECTED_ARTIFACT_PATH: ${{ runner.temp }}/cargo-actions-target
+        run: |
+          case "${CACHE_HIT}" in true|false) ;; *) echo "invalid cache-hit output: ${CACHE_HIT}" >&2; exit 1 ;; esac
+          [[ -n "${ARTIFACT_ID}" ]]
+          [[ -n "${ARTIFACT_URL}" ]]
+          [[ "${ARTIFACT_DIGEST}" == sha256:* ]]
+          [[ "${ARTIFACT_PATH}" == "${EXPECTED_ARTIFACT_PATH}" ]]
+
       - name: Check
         uses: ./src/cargo-check-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          all-targets: "true"
-          cache: "false"
+          all-targets: 'true'
+          cache: 'false'
+
       - name: Test with default nextest runner
         uses: ./src/cargo-test-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          cache: "false"
+          cache: 'false'
+
       - name: Test cargo fallback
         uses: ./src/cargo-test-action
         with:
           runner: cargo
           working-directory: tests/fixtures/minimal-crate
-          cache: "false"
+          cache: 'false'
+
       - name: Clippy
         uses: ./src/cargo-clippy-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          all-targets: "true"
-          deny-warnings: "true"
-          cache: "false"
+          all-targets: 'true'
+          deny-warnings: 'true'
+          cache: 'false'
+
       - name: Format
         uses: ./src/cargo-fmt-action
         with:
           working-directory: tests/fixtures/minimal-crate
+
       - name: Documentation
         uses: ./src/cargo-doc-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          no-deps: "true"
-          cache: "false"
+          no-deps: 'true'
+          cache: 'false'
+
       - name: Bench compile with default criterion runner
         uses: ./src/cargo-bench-action
         with:
           working-directory: tests/fixtures/minimal-crate
-          no-run: "true"
-          cache: "false"
+          no-run: 'true'
+          cache: 'false'
+
       - name: Bench cargo fallback
         uses: ./src/cargo-bench-action
         with:
           runner: cargo
           working-directory: tests/fixtures/minimal-crate
-          no-run: "true"
-          cache: "false"
+          no-run: 'true'
+          cache: 'false'
+
+  cross-target:
+    name: cross target
+    needs: contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build wasm32-unknown-unknown
+        uses: ./src/cargo-build-action
+        with:
+          working-directory: tests/fixtures/minimal-crate
+          lib: 'true'
+          target: wasm32-unknown-unknown
+          cache: 'false'

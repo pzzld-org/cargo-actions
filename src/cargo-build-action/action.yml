@@ -1,16 +1,18 @@
 name: Cargo Build
-description: Build Rust crates and workspaces with a reusable, matrix-agnostic Cargo interface.
+description: Build Rust crates and workspaces through a matrix-agnostic, externally composable Cargo interface.
+author: pzzld-org
+
 inputs:
   toolchain:
-    description: Rust toolchain to use.
+    description: Rust toolchain passed to actions-rust-lang/setup-rust-toolchain.
     required: false
     default: stable
   working-directory:
     description: Directory containing the Cargo project.
     required: false
-    default: .
+    default: '.'
   manifest-path:
-    description: Path to Cargo.toml, relative to working-directory.
+    description: Path to Cargo.toml, relative to working-directory unless absolute.
     required: false
     default: ''
   package:
@@ -18,7 +20,7 @@ inputs:
     required: false
     default: ''
   packages:
-    description: Additional package specifications, one per line.
+    description: Additional package specifications, one complete specification per line.
     required: false
     default: ''
   workspace:
@@ -26,19 +28,19 @@ inputs:
     required: false
     default: 'false'
   exclude:
-    description: Workspace package specifications to exclude, one per line.
+    description: Workspace package specifications to exclude, one complete specification per line.
     required: false
     default: ''
   features:
-    description: Cargo feature list. Cargo accepts comma- or space-separated values. "default" is a no-op; "all" maps to --all-features.
+    description: Cargo feature list. Cargo accepts comma- or space-separated values; default is a no-op and all maps to --all-features.
     required: false
     default: ''
   all-features:
-    description: Enable all features.
+    description: Enable all features with --all-features.
     required: false
     default: 'false'
   no-default-features:
-    description: Disable default features.
+    description: Disable default features with --no-default-features.
     required: false
     default: 'false'
   lib:
@@ -46,7 +48,7 @@ inputs:
     required: false
     default: 'false'
   bin:
-    description: Binary target names, one per line.
+    description: Binary target names, one complete name per line.
     required: false
     default: ''
   bins:
@@ -54,7 +56,7 @@ inputs:
     required: false
     default: 'false'
   example:
-    description: Example target names, one per line.
+    description: Example target names, one complete name per line.
     required: false
     default: ''
   examples:
@@ -62,15 +64,15 @@ inputs:
     required: false
     default: 'false'
   test:
-    description: Integration test target names, one per line.
+    description: Integration-test target names, one complete name per line.
     required: false
     default: ''
   tests:
-    description: Select all integration test targets.
+    description: Select all integration-test targets.
     required: false
     default: 'false'
   bench:
-    description: Benchmark target names, one per line.
+    description: Benchmark target names, one complete name per line.
     required: false
     default: ''
   benches:
@@ -82,7 +84,7 @@ inputs:
     required: false
     default: 'false'
   target:
-    description: Compilation target triple. The target is installed with the selected toolchain.
+    description: Compilation target triple. The requested target is installed with the selected toolchain.
     required: false
     default: ''
   jobs:
@@ -102,7 +104,7 @@ inputs:
     required: false
     default: 'false'
   target-dir:
-    description: Directory for generated artifacts, relative to working-directory unless absolute.
+    description: Cargo target directory, relative to working-directory unless absolute.
     required: false
     default: ''
   locked:
@@ -110,7 +112,7 @@ inputs:
     required: false
     default: 'true'
   frozen:
-    description: Disallow network and Cargo.lock changes.
+    description: Disallow network access and Cargo.lock changes.
     required: false
     default: 'false'
   offline:
@@ -130,127 +132,178 @@ inputs:
     required: false
     default: 'false'
   color:
-    description: 'Cargo terminal color mode: auto, always, or never.'
+    description: Cargo terminal color mode. Accepted values are auto, always, and never.
     required: false
     default: always
   message-format:
     description: Cargo message format, for example human, short, json, or json-diagnostic-short.
     required: false
     default: ''
-  extra-args:
-    description: Additional Cargo arguments, one complete argument per line. Values are not shell-evaluated.
-    required: false
-    default: ''
-  cache:
-    description: Enable sccache and Rust dependency caching.
-    required: false
-    default: 'true'
-  cache-key:
-    description: Override the shared Rust cache key. Empty derives a command/OS/toolchain/target key.
-    required: false
-    default: ''
-  cache-workspaces:
-    description: Cargo workspace roots passed to Swatinem/rust-cache.
-    required: false
-    default: .
   config:
-    description: Cargo configuration overrides, one KEY=VALUE or path per line.
+    description: Cargo configuration overrides, one complete KEY=VALUE or path argument per line.
     required: false
     default: ''
   future-incompat-report:
     description: Display the latest future-incompatibility report.
     required: false
     default: 'false'
+  extra-args:
+    description: Additional Cargo arguments, one complete argument per line. Values are never shell-evaluated.
+    required: false
+    default: ''
+  cache:
+    description: Enable the shared sccache and Cargo dependency-cache layers.
+    required: false
+    default: 'true'
+  cache-key:
+    description: Override the shared cache key. Empty derives a key from OS, toolchain, and compilation target.
+    required: false
+    default: ''
+  cache-workspaces:
+    description: Cargo workspace roots passed to Swatinem/rust-cache, one workspace specification per line.
+    required: false
+    default: '.'
   artifact:
-    description: Upload build outputs as a workflow artifact.
+    description: Upload build outputs with actions/upload-artifact.
     required: false
     default: 'false'
   artifact-name:
-    description: Artifact name. Empty derives cargo-build-<os>.
+    description: Workflow-artifact name. Empty derives cargo-build-<os>.
     required: false
     default: ''
   artifact-path:
-    description: Artifact path. Empty uses target-dir or <working-directory>/target.
+    description: Artifact path. Relative paths resolve from working-directory; absolute paths are preserved. Empty uses target-dir or target.
     required: false
     default: ''
   artifact-if-no-files-found:
-    description: upload-artifact behavior when no files are found.
+    description: Behavior when no artifact files are found. Accepted values are error, warn, and ignore.
     required: false
     default: error
   artifact-retention-days:
-    description: Artifact retention in days.
+    description: Artifact retention in days. Use 0 to inherit the repository default.
     required: false
     default: '7'
+  artifact-compression-level:
+    description: Zlib compression level from 0 through 9.
+    required: false
+    default: '6'
+  artifact-overwrite:
+    description: Delete an existing artifact with the same name before upload.
+    required: false
+    default: 'false'
+  artifact-include-hidden-files:
+    description: Include hidden files in the uploaded artifact.
+    required: false
+    default: 'false'
+  artifact-archive:
+    description: Archive matching files before upload. Set false only when uploading one file.
+    required: false
+    default: 'true'
+
+outputs:
+  cache-hit:
+    description: Whether rust-cache restored an exact dependency-cache match. Empty when cache is disabled.
+    value: ${{ steps.cache.outputs.cache-hit }}
+  artifact-id:
+    description: Identifier of the uploaded artifact. Empty when artifact upload is disabled or fails.
+    value: ${{ steps.artifact.outputs.artifact-id }}
+  artifact-url:
+    description: Authenticated GitHub URL for the uploaded artifact.
+    value: ${{ steps.artifact.outputs.artifact-url }}
+  artifact-digest:
+    description: SHA-256 digest reported by actions/upload-artifact.
+    value: ${{ steps.artifact.outputs.artifact-digest }}
+  artifact-path:
+    description: Resolved artifact path passed to actions/upload-artifact.
+    value: ${{ steps.artifact-path.outputs.path }}
+
 runs:
   using: composite
   steps:
-  - name: Setup Rust
-    uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
-    with:
-      cache: 'false'
-      toolchain: ${{ inputs.toolchain }}
-      target: ${{ inputs.target }}
-  - name: Setup sccache
-    if: inputs.cache == 'true'
-    uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
-  - name: Enable sccache GitHub Actions backend
-    if: inputs.cache == 'true'
-    shell: bash
-    run: 'echo "RUSTC_WRAPPER=sccache" >> "${GITHUB_ENV}"
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      with:
+        cache: 'false'
+        toolchain: ${{ inputs.toolchain }}
+        target: ${{ inputs.target }}
 
-      echo "SCCACHE_GHA_ENABLED=true" >> "${GITHUB_ENV}"'
-  - name: Setup Rust dependency cache
-    if: inputs.cache == 'true'
-    uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-    with:
-      shared-key: ${{ inputs.cache-key || format('build-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
-      cache-targets: 'false'
-      workspaces: ${{ inputs.cache-workspaces }}
-  - name: Cargo Build
-    shell: bash
-    working-directory: ${{ inputs.working-directory }}
-    env:
-      CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
-      CARGO_ACTION_PACKAGE: ${{ inputs.package }}
-      CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
-      CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
-      CARGO_ACTION_EXCLUDE: ${{ inputs.exclude }}
-      CARGO_ACTION_FEATURES: ${{ inputs.features }}
-      CARGO_ACTION_ALL_FEATURES: ${{ inputs.all-features }}
-      CARGO_ACTION_NO_DEFAULT_FEATURES: ${{ inputs.no-default-features }}
-      CARGO_ACTION_LIB: ${{ inputs.lib }}
-      CARGO_ACTION_BIN: ${{ inputs.bin }}
-      CARGO_ACTION_BINS: ${{ inputs.bins }}
-      CARGO_ACTION_EXAMPLE: ${{ inputs.example }}
-      CARGO_ACTION_EXAMPLES: ${{ inputs.examples }}
-      CARGO_ACTION_TEST: ${{ inputs.test }}
-      CARGO_ACTION_TESTS: ${{ inputs.tests }}
-      CARGO_ACTION_BENCH: ${{ inputs.bench }}
-      CARGO_ACTION_BENCHES: ${{ inputs.benches }}
-      CARGO_ACTION_ALL_TARGETS: ${{ inputs.all-targets }}
-      CARGO_ACTION_TARGET: ${{ inputs.target }}
-      CARGO_ACTION_JOBS: ${{ inputs.jobs }}
-      CARGO_ACTION_KEEP_GOING: ${{ inputs.keep-going }}
-      CARGO_ACTION_PROFILE: ${{ inputs.profile }}
-      CARGO_ACTION_RELEASE: ${{ inputs.release }}
-      CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
-      CARGO_ACTION_LOCKED: ${{ inputs.locked }}
-      CARGO_ACTION_FROZEN: ${{ inputs.frozen }}
-      CARGO_ACTION_OFFLINE: ${{ inputs.offline }}
-      CARGO_ACTION_IGNORE_RUST_VERSION: ${{ inputs.ignore-rust-version }}
-      CARGO_ACTION_VERBOSE: ${{ inputs.verbose }}
-      CARGO_ACTION_QUIET: ${{ inputs.quiet }}
-      CARGO_ACTION_COLOR: ${{ inputs.color }}
-      CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
-      CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
-      CARGO_ACTION_CONFIG: ${{ inputs.config }}
-      CARGO_ACTION_FUTURE_INCOMPAT_REPORT: ${{ inputs.future-incompat-report }}
-    run: bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" build
-  - name: Upload build artifact
-    if: inputs.artifact == 'true'
-    uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-    with:
-      name: ${{ inputs.artifact-name || format('cargo-build-{0}', runner.os) }}
-      path: ${{ inputs.artifact-path || (inputs.target-dir && format('{0}/{1}', inputs.working-directory, inputs.target-dir)) || format('{0}/target', inputs.working-directory) }}
-      if-no-files-found: ${{ inputs.artifact-if-no-files-found }}
-      retention-days: ${{ inputs.artifact-retention-days }}
+    - name: Setup Rust cache
+      id: cache
+      if: inputs.cache == 'true'
+      uses: $/src/setup-rust-cache
+      with:
+        key: ${{ inputs.cache-key || format('cargo-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
+        workspaces: ${{ inputs.cache-workspaces }}
+
+    - name: Build
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
+        CARGO_ACTION_PACKAGE: ${{ inputs.package }}
+        CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
+        CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
+        CARGO_ACTION_EXCLUDE: ${{ inputs.exclude }}
+        CARGO_ACTION_FEATURES: ${{ inputs.features }}
+        CARGO_ACTION_ALL_FEATURES: ${{ inputs.all-features }}
+        CARGO_ACTION_NO_DEFAULT_FEATURES: ${{ inputs.no-default-features }}
+        CARGO_ACTION_LIB: ${{ inputs.lib }}
+        CARGO_ACTION_BIN: ${{ inputs.bin }}
+        CARGO_ACTION_BINS: ${{ inputs.bins }}
+        CARGO_ACTION_EXAMPLE: ${{ inputs.example }}
+        CARGO_ACTION_EXAMPLES: ${{ inputs.examples }}
+        CARGO_ACTION_TEST: ${{ inputs.test }}
+        CARGO_ACTION_TESTS: ${{ inputs.tests }}
+        CARGO_ACTION_BENCH: ${{ inputs.bench }}
+        CARGO_ACTION_BENCHES: ${{ inputs.benches }}
+        CARGO_ACTION_ALL_TARGETS: ${{ inputs.all-targets }}
+        CARGO_ACTION_TARGET: ${{ inputs.target }}
+        CARGO_ACTION_JOBS: ${{ inputs.jobs }}
+        CARGO_ACTION_KEEP_GOING: ${{ inputs.keep-going }}
+        CARGO_ACTION_PROFILE: ${{ inputs.profile }}
+        CARGO_ACTION_RELEASE: ${{ inputs.release }}
+        CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
+        CARGO_ACTION_LOCKED: ${{ inputs.locked }}
+        CARGO_ACTION_FROZEN: ${{ inputs.frozen }}
+        CARGO_ACTION_OFFLINE: ${{ inputs.offline }}
+        CARGO_ACTION_IGNORE_RUST_VERSION: ${{ inputs.ignore-rust-version }}
+        CARGO_ACTION_VERBOSE: ${{ inputs.verbose }}
+        CARGO_ACTION_QUIET: ${{ inputs.quiet }}
+        CARGO_ACTION_COLOR: ${{ inputs.color }}
+        CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
+        CARGO_ACTION_CONFIG: ${{ inputs.config }}
+        CARGO_ACTION_FUTURE_INCOMPAT_REPORT: ${{ inputs.future-incompat-report }}
+        CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
+        CARGO_ACTION_CACHE: ${{ inputs.cache }}
+        CARGO_ACTION_ARTIFACT: ${{ inputs.artifact }}
+        CARGO_ACTION_ARTIFACT_IF_NO_FILES_FOUND: ${{ inputs.artifact-if-no-files-found }}
+        CARGO_ACTION_ARTIFACT_RETENTION_DAYS: ${{ inputs.artifact-retention-days }}
+        CARGO_ACTION_ARTIFACT_COMPRESSION_LEVEL: ${{ inputs.artifact-compression-level }}
+        CARGO_ACTION_ARTIFACT_OVERWRITE: ${{ inputs.artifact-overwrite }}
+        CARGO_ACTION_ARTIFACT_INCLUDE_HIDDEN_FILES: ${{ inputs.artifact-include-hidden-files }}
+        CARGO_ACTION_ARTIFACT_ARCHIVE: ${{ inputs.artifact-archive }}
+      run: bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" build
+
+    - name: Resolve artifact path
+      id: artifact-path
+      if: inputs.artifact == 'true'
+      shell: bash
+      env:
+        CARGO_ACTION_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        CARGO_ACTION_ARTIFACT_PATH: ${{ inputs.artifact-path }}
+        CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
+      run: bash "${GITHUB_ACTION_PATH}/../_shared/resolve-artifact-path.sh"
+
+    - name: Upload build artifact
+      id: artifact
+      if: inputs.artifact == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name || format('cargo-build-{0}', runner.os) }}
+        path: ${{ steps.artifact-path.outputs.path }}
+        if-no-files-found: ${{ inputs.artifact-if-no-files-found }}
+        retention-days: ${{ inputs.artifact-retention-days }}
+        compression-level: ${{ inputs.artifact-compression-level }}
+        overwrite: ${{ inputs.artifact-overwrite }}
+        include-hidden-files: ${{ inputs.artifact-include-hidden-files }}
+        archive: ${{ inputs.artifact-archive }}

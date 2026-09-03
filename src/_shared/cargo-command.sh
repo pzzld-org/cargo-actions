@@ -1,33 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-command="${1:?cargo subcommand is required}"
+readonly SHARED_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "${SHARED_DIR}/lib.sh"
 
-is_true() {
-  case "${1:-false}" in
-    1|true|TRUE|yes|YES|on|ON) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+command="${1:-}"
+case "$command" in
+  build|check|test|bench|clippy|doc|fmt) ;;
+  "") cargo_actions_die "Cargo subcommand is required" ;;
+  *) cargo_actions_die "unsupported Cargo subcommand: ${command}" ;;
+esac
 
-append_lines() {
-  local flag="$1"
-  local values="${2:-}"
-  local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" ]] && continue
-    args+=("$flag" "$line")
-  done <<< "$values"
-}
-
-append_raw_lines() {
-  local values="${1:-}"
-  local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" ]] && continue
-    args+=("$line")
-  done <<< "$values"
-}
+validate_common_inputs
+if [[ "$command" == "build" ]]; then
+  validate_artifact_inputs
+fi
 
 append_common_package_args() {
   if is_true "${CARGO_ACTION_WORKSPACE:-false}"; then
@@ -38,7 +26,6 @@ append_common_package_args() {
     args+=(--package "${CARGO_ACTION_PACKAGE}")
   fi
   append_lines --package "${CARGO_ACTION_PACKAGES:-}"
-
   append_lines --exclude "${CARGO_ACTION_EXCLUDE:-}"
 }
 
@@ -88,9 +75,7 @@ append_common_feature_args() {
         args+=(--all-features)
       fi
       ;;
-    *)
-      args+=(--features "${CARGO_ACTION_FEATURES}")
-      ;;
+    *) args+=(--features "${CARGO_ACTION_FEATURES}") ;;
   esac
 }
 
@@ -101,19 +86,9 @@ append_common_compile_args() {
 
   if is_true "${CARGO_ACTION_KEEP_GOING:-false}"; then
     case "$command" in
-      test|bench)
-        printf 'cargo-actions: keep-going is not supported by cargo %s; use no-fail-fast instead\n' "$command" >&2
-        exit 2
-        ;;
-      *)
-        args+=(--keep-going)
-        ;;
+      test|bench) cargo_actions_die "keep-going is not supported by cargo ${command}; use no-fail-fast instead" ;;
+      *) args+=(--keep-going) ;;
     esac
-  fi
-
-  if is_true "${CARGO_ACTION_RELEASE:-false}" && [[ -n "${CARGO_ACTION_PROFILE:-}" ]]; then
-    printf 'cargo-actions: release=true and profile=%s are mutually exclusive\n' "${CARGO_ACTION_PROFILE}" >&2
-    exit 2
   fi
 
   if is_true "${CARGO_ACTION_RELEASE:-false}"; then
@@ -136,42 +111,17 @@ append_common_manifest_args() {
     args+=(--manifest-path "${CARGO_ACTION_MANIFEST_PATH}")
   fi
 
-  if is_true "${CARGO_ACTION_LOCKED:-true}"; then
-    args+=(--locked)
-  fi
-
-  if is_true "${CARGO_ACTION_FROZEN:-false}"; then
-    args+=(--frozen)
-  fi
-
-  if is_true "${CARGO_ACTION_OFFLINE:-false}"; then
-    args+=(--offline)
-  fi
-
-  if is_true "${CARGO_ACTION_IGNORE_RUST_VERSION:-false}"; then
-    args+=(--ignore-rust-version)
-  fi
-
-  if is_true "${CARGO_ACTION_FUTURE_INCOMPAT_REPORT:-false}"; then
-    args+=(--future-incompat-report)
-  fi
-
+  if is_true "${CARGO_ACTION_LOCKED:-true}"; then args+=(--locked); fi
+  if is_true "${CARGO_ACTION_FROZEN:-false}"; then args+=(--frozen); fi
+  if is_true "${CARGO_ACTION_OFFLINE:-false}"; then args+=(--offline); fi
+  if is_true "${CARGO_ACTION_IGNORE_RUST_VERSION:-false}"; then args+=(--ignore-rust-version); fi
+  if is_true "${CARGO_ACTION_FUTURE_INCOMPAT_REPORT:-false}"; then args+=(--future-incompat-report); fi
   append_lines --config "${CARGO_ACTION_CONFIG:-}"
 }
 
 append_common_output_args() {
-  if is_true "${CARGO_ACTION_VERBOSE:-false}" && is_true "${CARGO_ACTION_QUIET:-false}"; then
-    printf 'cargo-actions: verbose=true and quiet=true are mutually exclusive\n' >&2
-    exit 2
-  fi
-
-  if is_true "${CARGO_ACTION_VERBOSE:-false}"; then
-    args+=(--verbose)
-  fi
-
-  if is_true "${CARGO_ACTION_QUIET:-false}"; then
-    args+=(--quiet)
-  fi
+  if is_true "${CARGO_ACTION_VERBOSE:-false}"; then args+=(--verbose); fi
+  if is_true "${CARGO_ACTION_QUIET:-false}"; then args+=(--quiet); fi
 
   if [[ -n "${CARGO_ACTION_COLOR:-always}" ]]; then
     args+=(--color "${CARGO_ACTION_COLOR:-always}")
@@ -217,17 +167,11 @@ else
 
   case "$command" in
     test|bench)
-      if is_true "${CARGO_ACTION_NO_RUN:-false}"; then
-        args+=(--no-run)
-      fi
-      if is_true "${CARGO_ACTION_NO_FAIL_FAST:-false}"; then
-        args+=(--no-fail-fast)
-      fi
+      if is_true "${CARGO_ACTION_NO_RUN:-false}"; then args+=(--no-run); fi
+      if is_true "${CARGO_ACTION_NO_FAIL_FAST:-false}"; then args+=(--no-fail-fast); fi
       ;;
     clippy|doc)
-      if is_true "${CARGO_ACTION_NO_DEPS:-false}"; then
-        args+=(--no-deps)
-      fi
+      if is_true "${CARGO_ACTION_NO_DEPS:-false}"; then args+=(--no-deps); fi
       ;;
   esac
 
@@ -260,5 +204,4 @@ fi
 printf 'cargo'
 printf ' %q' "${args[@]}"
 printf '\n'
-
 exec cargo "${args[@]}"

@@ -1,136 +1,321 @@
 name: Cargo Test
-description: Run Rust tests with cargo-nextest by default, with cargo test available as a fallback.
+description: Run Rust tests with cargo-nextest by default, while preserving cargo test as an explicit fallback.
+author: pzzld-org
+
 inputs:
-  runner: {description: 'Test runner: nextest or cargo.', required: false, default: nextest}
-  nextest-version: {description: cargo-nextest version passed to taiki-e/install-action. Empty selects the installer default., required: false, default: ''}
-  nextest-profile: {description: nextest execution profile selected with --profile., required: false, default: ''}
-  nextest-retries: {description: Number of nextest retries for failing tests., required: false, default: ''}
-  nextest-test-threads: {description: Number of nextest test threads, or num-cpus., required: false, default: ''}
-  nextest-filterset: {description: nextest filterset expressions, one complete expression per line., required: false, default: ''}
-  nextest-partition: {description: 'nextest partition such as hash:1/2 or count:1/2.', required: false, default: ''}
-  nextest-run-ignored: {description: nextest ignored-test behavior such as default, only, or all., required: false, default: ''}
-  nextest-no-tests: {description: nextest behavior when no tests match such as pass, warn, or fail., required: false, default: ''}
-  toolchain: {description: Rust toolchain to use., required: false, default: stable}
-  working-directory: {description: Directory containing the Cargo project., required: false, default: .}
-  manifest-path: {description: Path to Cargo.toml, relative to working-directory., required: false, default: ''}
-  package: {description: Single package specification passed with --package., required: false, default: ''}
-  packages: {description: Additional package specifications, one per line., required: false, default: ''}
-  workspace: {description: Operate on all workspace members., required: false, default: 'false'}
-  exclude: {description: Workspace package specifications to exclude, one per line., required: false, default: ''}
-  features: {description: 'Cargo feature list. Cargo accepts comma- or space-separated values. "default" is a no-op; "all" maps to --all-features.', required: false, default: ''}
-  all-features: {description: Enable all features., required: false, default: 'false'}
-  no-default-features: {description: Disable default features., required: false, default: 'false'}
-  lib: {description: Select the library target., required: false, default: 'false'}
-  bin: {description: Binary target names, one per line., required: false, default: ''}
-  bins: {description: Select all binary targets., required: false, default: 'false'}
-  example: {description: Example target names, one per line., required: false, default: ''}
-  examples: {description: Select all example targets., required: false, default: 'false'}
-  test: {description: Integration test target names, one per line., required: false, default: ''}
-  tests: {description: Select all integration test targets., required: false, default: 'false'}
-  bench: {description: Benchmark target names, one per line., required: false, default: ''}
-  benches: {description: Select all benchmark targets., required: false, default: 'false'}
-  all-targets: {description: Select all available targets., required: false, default: 'false'}
-  target: {description: Compilation target triple. The target is installed with the selected toolchain., required: false, default: ''}
-  jobs: {description: Number of parallel Cargo build jobs. For nextest this maps to --build-jobs., required: false, default: ''}
-  profile: {description: Cargo compilation profile. For nextest this maps to --cargo-profile., required: false, default: ''}
-  release: {description: Use the release profile., required: false, default: 'false'}
-  target-dir: {description: Directory for generated artifacts, relative to working-directory unless absolute., required: false, default: ''}
-  locked: {description: Require Cargo.lock to be up to date., required: false, default: 'true'}
-  frozen: {description: Disallow network and Cargo.lock changes., required: false, default: 'false'}
-  offline: {description: Disallow network access., required: false, default: 'false'}
-  ignore-rust-version: {description: Ignore package rust-version declarations., required: false, default: 'false'}
-  verbose: {description: Enable verbose output., required: false, default: 'false'}
-  quiet: {description: Suppress Cargo output. Supported by runner=cargo only., required: false, default: 'false'}
-  color: {description: 'Terminal color mode: auto, always, or never.', required: false, default: always}
-  message-format: {description: Cargo build message format. nextest maps this to --cargo-message-format., required: false, default: ''}
-  extra-args: {description: Additional runner arguments, one complete argument per line. Values are not shell-evaluated., required: false, default: ''}
-  cache: {description: Enable sccache and Rust dependency caching., required: false, default: 'true'}
-  cache-key: {description: Override the shared Rust cache key. Empty derives a command/OS/toolchain/target key., required: false, default: ''}
-  cache-workspaces: {description: Cargo workspace roots passed to Swatinem/rust-cache., required: false, default: .}
-  config: {description: Cargo configuration overrides, one KEY=VALUE or path per line., required: false, default: ''}
-  future-incompat-report: {description: Display the latest future-incompatibility report. Supported by runner=cargo only., required: false, default: 'false'}
-  no-run: {description: Compile tests without running them., required: false, default: 'false'}
-  no-fail-fast: {description: Run all tests even after failures., required: false, default: 'false'}
-  filter: {description: Optional positional test-name filter., required: false, default: ''}
-  test-args: {description: Arguments forwarded after --, one complete argument per line., required: false, default: ''}
+  runner:
+    description: Test runner. Accepted values are nextest and cargo.
+    required: false
+    default: nextest
+  nextest-version:
+    description: cargo-nextest version installed by taiki-e/install-action. The tested default is pinned; use latest to opt into upstream latest.
+    required: false
+    default: '0.9.143'
+  nextest-profile:
+    description: Nextest execution profile selected with --profile.
+    required: false
+    default: ''
+  nextest-retries:
+    description: Number of nextest retries for failing tests.
+    required: false
+    default: ''
+  nextest-test-threads:
+    description: Number of nextest test threads, a non-zero relative integer, or num-cpus.
+    required: false
+    default: ''
+  nextest-filterset:
+    description: Nextest filterset expressions, one complete expression per line.
+    required: false
+    default: ''
+  nextest-partition:
+    description: Nextest partition specification, for example hash:1/2 or count:1/2.
+    required: false
+    default: ''
+  nextest-run-ignored:
+    description: Ignored-test policy. Accepted values are default, only, and all.
+    required: false
+    default: ''
+  nextest-no-tests:
+    description: Behavior when no tests match. Accepted values are fail, warn, and pass.
+    required: false
+    default: ''
+  toolchain:
+    description: Rust toolchain passed to actions-rust-lang/setup-rust-toolchain.
+    required: false
+    default: stable
+  working-directory:
+    description: Directory containing the Cargo project.
+    required: false
+    default: '.'
+  manifest-path:
+    description: Path to Cargo.toml, relative to working-directory unless absolute.
+    required: false
+    default: ''
+  package:
+    description: Single package specification passed with --package.
+    required: false
+    default: ''
+  packages:
+    description: Additional package specifications, one complete specification per line.
+    required: false
+    default: ''
+  workspace:
+    description: Operate on all workspace members.
+    required: false
+    default: 'false'
+  exclude:
+    description: Workspace package specifications to exclude, one complete specification per line.
+    required: false
+    default: ''
+  features:
+    description: Cargo feature list. Cargo accepts comma- or space-separated values; default is a no-op and all maps to --all-features.
+    required: false
+    default: ''
+  all-features:
+    description: Enable all features.
+    required: false
+    default: 'false'
+  no-default-features:
+    description: Disable default features.
+    required: false
+    default: 'false'
+  lib:
+    description: Select the library target.
+    required: false
+    default: 'false'
+  bin:
+    description: Binary target names, one complete name per line.
+    required: false
+    default: ''
+  bins:
+    description: Select all binary targets.
+    required: false
+    default: 'false'
+  example:
+    description: Example target names, one complete name per line.
+    required: false
+    default: ''
+  examples:
+    description: Select all example targets.
+    required: false
+    default: 'false'
+  test:
+    description: Integration-test target names, one complete name per line.
+    required: false
+    default: ''
+  tests:
+    description: Select all integration-test targets.
+    required: false
+    default: 'false'
+  bench:
+    description: Benchmark target names, one complete name per line.
+    required: false
+    default: ''
+  benches:
+    description: Select all benchmark targets.
+    required: false
+    default: 'false'
+  all-targets:
+    description: Select all available targets.
+    required: false
+    default: 'false'
+  target:
+    description: Compilation target triple. The requested target is installed with the selected toolchain.
+    required: false
+    default: ''
+  jobs:
+    description: Number of parallel Cargo build jobs. Nextest maps this input to --build-jobs.
+    required: false
+    default: ''
+  profile:
+    description: Cargo compilation profile. Nextest maps this input to --cargo-profile. Mutually exclusive with release=true.
+    required: false
+    default: ''
+  release:
+    description: Use the release profile.
+    required: false
+    default: 'false'
+  target-dir:
+    description: Cargo target directory, relative to working-directory unless absolute.
+    required: false
+    default: ''
+  locked:
+    description: Require Cargo.lock to be up to date.
+    required: false
+    default: 'true'
+  frozen:
+    description: Disallow network access and Cargo.lock changes.
+    required: false
+    default: 'false'
+  offline:
+    description: Disallow network access.
+    required: false
+    default: 'false'
+  ignore-rust-version:
+    description: Ignore package rust-version declarations.
+    required: false
+    default: 'false'
+  verbose:
+    description: Enable verbose output.
+    required: false
+    default: 'false'
+  quiet:
+    description: Suppress Cargo output. Supported only with runner=cargo.
+    required: false
+    default: 'false'
+  color:
+    description: Terminal color mode. Accepted values are auto, always, and never.
+    required: false
+    default: always
+  message-format:
+    description: Cargo build message format. Nextest maps this input to --cargo-message-format.
+    required: false
+    default: ''
+  config:
+    description: Cargo configuration overrides, one complete KEY=VALUE or path argument per line.
+    required: false
+    default: ''
+  future-incompat-report:
+    description: Display the latest future-incompatibility report. Supported only with runner=cargo.
+    required: false
+    default: 'false'
+  no-run:
+    description: Compile tests without running them.
+    required: false
+    default: 'false'
+  no-fail-fast:
+    description: Run all tests even after failures.
+    required: false
+    default: 'false'
+  filter:
+    description: Optional positional test-name filter.
+    required: false
+    default: ''
+  test-args:
+    description: Arguments forwarded after --, one complete argument per line.
+    required: false
+    default: ''
+  extra-args:
+    description: Additional runner arguments, one complete argument per line. Values are never shell-evaluated.
+    required: false
+    default: ''
+  cache:
+    description: Enable the shared sccache and Cargo dependency-cache layers.
+    required: false
+    default: 'true'
+  cache-key:
+    description: Override the shared cache key. Empty derives a key from OS, toolchain, and compilation target.
+    required: false
+    default: ''
+  cache-workspaces:
+    description: Cargo workspace roots passed to Swatinem/rust-cache, one workspace specification per line.
+    required: false
+    default: '.'
+
+outputs:
+  cache-hit:
+    description: Whether rust-cache restored an exact dependency-cache match. Empty when cache is disabled.
+    value: ${{ steps.cache.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
-  - name: Setup Rust
-    uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
-    with: {cache: 'false', toolchain: '${{ inputs.toolchain }}', target: '${{ inputs.target }}'}
-  - name: Install cargo-nextest
-    if: inputs.runner == 'nextest'
-    uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
-    with:
-      tool: ${{ inputs.nextest-version == '' && 'cargo-nextest' || format('cargo-nextest@{0}', inputs.nextest-version) }}
-      fallback: cargo-binstall
-  - name: Setup sccache
-    if: inputs.cache == 'true'
-    uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
-  - name: Enable sccache GitHub Actions backend
-    if: inputs.cache == 'true'
-    shell: bash
-    run: |
-      echo "RUSTC_WRAPPER=sccache" >> "${GITHUB_ENV}"
-      echo "SCCACHE_GHA_ENABLED=true" >> "${GITHUB_ENV}"
-  - name: Setup Rust dependency cache
-    if: inputs.cache == 'true'
-    uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-    with: {shared-key: "${{ inputs.cache-key || format('test-{0}-{1}-{2}-{3}', inputs.runner, runner.os, inputs.toolchain, inputs.target || 'host') }}", cache-targets: 'false', workspaces: '${{ inputs.cache-workspaces }}'}
-  - name: Run tests
-    shell: bash
-    working-directory: ${{ inputs.working-directory }}
-    env:
-      CARGO_ACTION_RUNNER: ${{ inputs.runner }}
-      CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
-      CARGO_ACTION_PACKAGE: ${{ inputs.package }}
-      CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
-      CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
-      CARGO_ACTION_EXCLUDE: ${{ inputs.exclude }}
-      CARGO_ACTION_FEATURES: ${{ inputs.features }}
-      CARGO_ACTION_ALL_FEATURES: ${{ inputs.all-features }}
-      CARGO_ACTION_NO_DEFAULT_FEATURES: ${{ inputs.no-default-features }}
-      CARGO_ACTION_LIB: ${{ inputs.lib }}
-      CARGO_ACTION_BIN: ${{ inputs.bin }}
-      CARGO_ACTION_BINS: ${{ inputs.bins }}
-      CARGO_ACTION_EXAMPLE: ${{ inputs.example }}
-      CARGO_ACTION_EXAMPLES: ${{ inputs.examples }}
-      CARGO_ACTION_TEST: ${{ inputs.test }}
-      CARGO_ACTION_TESTS: ${{ inputs.tests }}
-      CARGO_ACTION_BENCH: ${{ inputs.bench }}
-      CARGO_ACTION_BENCHES: ${{ inputs.benches }}
-      CARGO_ACTION_ALL_TARGETS: ${{ inputs.all-targets }}
-      CARGO_ACTION_TARGET: ${{ inputs.target }}
-      CARGO_ACTION_JOBS: ${{ inputs.jobs }}
-      CARGO_ACTION_PROFILE: ${{ inputs.profile }}
-      CARGO_ACTION_RELEASE: ${{ inputs.release }}
-      CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
-      CARGO_ACTION_LOCKED: ${{ inputs.locked }}
-      CARGO_ACTION_FROZEN: ${{ inputs.frozen }}
-      CARGO_ACTION_OFFLINE: ${{ inputs.offline }}
-      CARGO_ACTION_IGNORE_RUST_VERSION: ${{ inputs.ignore-rust-version }}
-      CARGO_ACTION_VERBOSE: ${{ inputs.verbose }}
-      CARGO_ACTION_QUIET: ${{ inputs.quiet }}
-      CARGO_ACTION_COLOR: ${{ inputs.color }}
-      CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
-      CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
-      CARGO_ACTION_CONFIG: ${{ inputs.config }}
-      CARGO_ACTION_FUTURE_INCOMPAT_REPORT: ${{ inputs.future-incompat-report }}
-      CARGO_ACTION_NO_RUN: ${{ inputs.no-run }}
-      CARGO_ACTION_NO_FAIL_FAST: ${{ inputs.no-fail-fast }}
-      CARGO_ACTION_FILTER: ${{ inputs.filter }}
-      CARGO_ACTION_TRAILING_ARGS: ${{ inputs.test-args }}
-      NEXTEST_ACTION_PROFILE: ${{ inputs.nextest-profile }}
-      NEXTEST_ACTION_RETRIES: ${{ inputs.nextest-retries }}
-      NEXTEST_ACTION_TEST_THREADS: ${{ inputs.nextest-test-threads }}
-      NEXTEST_ACTION_FILTERSET: ${{ inputs.nextest-filterset }}
-      NEXTEST_ACTION_PARTITION: ${{ inputs.nextest-partition }}
-      NEXTEST_ACTION_RUN_IGNORED: ${{ inputs.nextest-run-ignored }}
-      NEXTEST_ACTION_NO_TESTS: ${{ inputs.nextest-no-tests }}
-    run: |
-      case "${CARGO_ACTION_RUNNER}" in
-        nextest) exec bash "${GITHUB_ACTION_PATH}/../_shared/nextest-command.sh" ;;
-        cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test ;;
-        *) echo "cargo-actions: unsupported test runner: ${CARGO_ACTION_RUNNER}" >&2; exit 2 ;;
-      esac
+    - name: Validate runner inputs
+      shell: bash
+      env:
+        CARGO_ACTION_RUNNER: ${{ inputs.runner }}
+        CARGO_ACTION_TOOL_VERSION: ${{ inputs.nextest-version }}
+        CARGO_ACTION_CACHE: ${{ inputs.cache }}
+      run: |
+        case "${CARGO_ACTION_RUNNER}" in
+          nextest|cargo) ;;
+          *) echo "cargo-actions: runner must be nextest or cargo (got: ${CARGO_ACTION_RUNNER})" >&2; exit 2 ;;
+        esac
+        case "${CARGO_ACTION_CACHE}" in
+          true|false) ;;
+          *) echo "cargo-actions: cache must be true or false (got: ${CARGO_ACTION_CACHE})" >&2; exit 2 ;;
+        esac
+        if [[ "${CARGO_ACTION_RUNNER}" == nextest && -z "${CARGO_ACTION_TOOL_VERSION}" ]]; then
+          echo 'cargo-actions: nextest-version must not be empty when runner=nextest' >&2
+          exit 2
+        fi
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      with:
+        cache: 'false'
+        toolchain: ${{ inputs.toolchain }}
+        target: ${{ inputs.target }}
+
+    - name: Install cargo-nextest
+      if: inputs.runner == 'nextest'
+      uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+      with:
+        tool: ${{ format('cargo-nextest@{0}', inputs.nextest-version) }}
+        fallback: cargo-binstall
+
+    - name: Setup Rust cache
+      id: cache
+      if: inputs.cache == 'true'
+      uses: $/src/setup-rust-cache
+      with:
+        key: ${{ inputs.cache-key || format('cargo-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
+        workspaces: ${{ inputs.cache-workspaces }}
+
+    - name: Run tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CARGO_ACTION_RUNNER: ${{ inputs.runner }}
+        CARGO_ACTION_MANIFEST_PATH: ${{ inputs.manifest-path }}
+        CARGO_ACTION_PACKAGE: ${{ inputs.package }}
+        CARGO_ACTION_PACKAGES: ${{ inputs.packages }}
+        CARGO_ACTION_WORKSPACE: ${{ inputs.workspace }}
+        CARGO_ACTION_EXCLUDE: ${{ inputs.exclude }}
+        CARGO_ACTION_FEATURES: ${{ inputs.features }}
+        CARGO_ACTION_ALL_FEATURES: ${{ inputs.all-features }}
+        CARGO_ACTION_NO_DEFAULT_FEATURES: ${{ inputs.no-default-features }}
+        CARGO_ACTION_LIB: ${{ inputs.lib }}
+        CARGO_ACTION_BIN: ${{ inputs.bin }}
+        CARGO_ACTION_BINS: ${{ inputs.bins }}
+        CARGO_ACTION_EXAMPLE: ${{ inputs.example }}
+        CARGO_ACTION_EXAMPLES: ${{ inputs.examples }}
+        CARGO_ACTION_TEST: ${{ inputs.test }}
+        CARGO_ACTION_TESTS: ${{ inputs.tests }}
+        CARGO_ACTION_BENCH: ${{ inputs.bench }}
+        CARGO_ACTION_BENCHES: ${{ inputs.benches }}
+        CARGO_ACTION_ALL_TARGETS: ${{ inputs.all-targets }}
+        CARGO_ACTION_TARGET: ${{ inputs.target }}
+        CARGO_ACTION_JOBS: ${{ inputs.jobs }}
+        CARGO_ACTION_PROFILE: ${{ inputs.profile }}
+        CARGO_ACTION_RELEASE: ${{ inputs.release }}
+        CARGO_ACTION_TARGET_DIR: ${{ inputs.target-dir }}
+        CARGO_ACTION_LOCKED: ${{ inputs.locked }}
+        CARGO_ACTION_FROZEN: ${{ inputs.frozen }}
+        CARGO_ACTION_OFFLINE: ${{ inputs.offline }}
+        CARGO_ACTION_IGNORE_RUST_VERSION: ${{ inputs.ignore-rust-version }}
+        CARGO_ACTION_VERBOSE: ${{ inputs.verbose }}
+        CARGO_ACTION_QUIET: ${{ inputs.quiet }}
+        CARGO_ACTION_COLOR: ${{ inputs.color }}
+        CARGO_ACTION_MESSAGE_FORMAT: ${{ inputs.message-format }}
+        CARGO_ACTION_CONFIG: ${{ inputs.config }}
+        CARGO_ACTION_FUTURE_INCOMPAT_REPORT: ${{ inputs.future-incompat-report }}
+        CARGO_ACTION_NO_RUN: ${{ inputs.no-run }}
+        CARGO_ACTION_NO_FAIL_FAST: ${{ inputs.no-fail-fast }}
+        CARGO_ACTION_FILTER: ${{ inputs.filter }}
+        CARGO_ACTION_TRAILING_ARGS: ${{ inputs.test-args }}
+        CARGO_ACTION_EXTRA_ARGS: ${{ inputs.extra-args }}
+        CARGO_ACTION_CACHE: ${{ inputs.cache }}
+        NEXTEST_ACTION_PROFILE: ${{ inputs.nextest-profile }}
+        NEXTEST_ACTION_RETRIES: ${{ inputs.nextest-retries }}
+        NEXTEST_ACTION_TEST_THREADS: ${{ inputs.nextest-test-threads }}
+        NEXTEST_ACTION_FILTERSET: ${{ inputs.nextest-filterset }}
+        NEXTEST_ACTION_PARTITION: ${{ inputs.nextest-partition }}
+        NEXTEST_ACTION_RUN_IGNORED: ${{ inputs.nextest-run-ignored }}
+        NEXTEST_ACTION_NO_TESTS: ${{ inputs.nextest-no-tests }}
+      run: |
+        case "${CARGO_ACTION_RUNNER}" in
+          nextest) exec bash "${GITHUB_ACTION_PATH}/../_shared/nextest-command.sh" ;;
+          cargo) exec bash "${GITHUB_ACTION_PATH}/../_shared/cargo-command.sh" test ;;
+          *) echo "cargo-actions: unsupported test runner: ${CARGO_ACTION_RUNNER}" >&2; exit 2 ;;
+        esac
