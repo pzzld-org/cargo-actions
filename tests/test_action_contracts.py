@@ -98,8 +98,12 @@ def main() -> int:
         fail("test: cargo-binstall fallback missing")
     if '_shared/nextest-command.sh' not in texts["test"] or '_shared/cargo-command.sh" test' not in texts["test"]:
         fail("test: nextest/cargo runner dispatch missing")
-    if "Accepted values are auto" in texts["test"]:
-        fail("test: nextest --no-tests documentation contains an unsupported value")
+    expected_no_tests_contract = (
+        "  nextest-no-tests:\n"
+        "    description: Behavior when no tests match. Accepted values are fail, warn, and pass.\n"
+    )
+    if expected_no_tests_contract not in texts["test"]:
+        fail("test: nextest --no-tests documentation must expose exactly fail, warn, and pass")
 
     if "default: criterion" not in texts["bench"]:
         fail("bench: cargo-criterion is not the default runner")
