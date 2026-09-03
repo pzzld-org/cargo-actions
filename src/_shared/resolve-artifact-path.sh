@@ -8,7 +8,7 @@ source "${SHARED_DIR}/lib.sh"
 
 : "${GITHUB_OUTPUT:?GITHUB_OUTPUT must be set by GitHub Actions}"
 
-working_directory="${CARGO_ACTION_WORKING_DIRECTORY:-.}"
+working_directory="${CARGO_ACTION_WORKING_DIRECTORY-.}"
 artifact_path="${CARGO_ACTION_ARTIFACT_PATH:-}"
 target_dir="${CARGO_ACTION_TARGET_DIR:-}"
 
