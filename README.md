@@ -171,7 +171,7 @@ The cache primitive uses:
 1. `mozilla-actions/sccache-action` for compiler caching;
 2. `Swatinem/rust-cache` with `cache-targets: false` for dependency caching.
 
-Default dependency-cache keys are shared across compatible Cargo operations and derive from operating system, toolchain, and target. Set `cache-key` when a caller needs an additional partition. Every compile action exposes `cache-hit` for downstream composition.
+Default dependency-cache keys are shared across compatible Cargo operations and derive from operating system, toolchain, and target. By default, the dependency-cache workspace is the action's `working-directory`, so Cargo metadata and lockfile hashing are evaluated against the same project that the action executes. `cache-workspaces` is an explicit override: when set, its newline-delimited values are passed through using `Swatinem/rust-cache` workspace syntax and are relative to the job workspace. Set `cache-key` when a caller needs an additional partition. Every compile action exposes `cache-hit` for downstream composition.
 
 `$/...` same-repository action references are supported on GitHub.com. GitHub Enterprise Server does not currently support this reference form; GHES consumers need a compatibility release that uses a different composition strategy.
 
@@ -195,7 +195,7 @@ Default dependency-cache keys are shared across compatible Cargo operations and 
   run: echo '${{ steps.build.outputs.artifact-digest }}'
 ```
 
-Artifact controls expose `if-no-files-found`, retention, compression, overwrite, hidden-file inclusion, and archive behavior. Relative `artifact-path` and `target-dir` values resolve from `working-directory`; Unix absolute paths, Windows drive paths, and UNC paths are preserved.
+Artifact controls expose `if-no-files-found`, retention, compression, overwrite, hidden-file inclusion, and archive behavior. Relative `artifact-path` and `target-dir` values resolve from `working-directory`; Unix absolute paths, Windows drive paths, and UNC paths are preserved. `artifact-digest` is the raw 64-character lowercase hexadecimal SHA-256 value returned by `actions/upload-artifact`.
 
 Build outputs:
 
