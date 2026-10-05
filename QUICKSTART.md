@@ -178,7 +178,7 @@ No action shell-evaluates these values.
 
 ## Cache behavior
 
-Integrated caching is enabled by default and shared across compatible Cargo commands for the same OS, toolchain, and target. The default dependency-cache workspace follows `working-directory`, so a project below the repository root is hashed and restored against the correct Cargo metadata and lockfile.
+Dependency restore is enabled by default and shared across Cargo commands for the same OS, toolchain, and target. Writes require `cache-save-if: 'true'` on a default-branch push; all other events remain restore-only. Pinned sccache uses its GHA `READ_ONLY` mode by default and `READ_WRITE` only when permitted. The default dependency-cache workspace follows `working-directory`, so a project below the repository root is hashed and restored against the correct Cargo metadata and lockfile.
 
 Use `cache-workspaces` only to override that default. Explicit values use `Swatinem/rust-cache` workspace syntax, are relative to the job workspace, and may contain one specification per line.
 
@@ -189,6 +189,6 @@ with:
   cache: 'false'
 ```
 
-Compile actions expose `cache-hit` for downstream steps.
+Compile actions expose `cache-hit`, `cache-write-enabled`, `sccache-enabled`, and `sccache-mode` for downstream steps. See the [cache/event contract](docs/cache-and-event-contract.md) before opting into writes.
 
 The public compile actions use GitHub's `$/src/setup-rust-cache` same-repository reference. This composition model targets GitHub.com; GitHub Enterprise Server does not currently support `$/...` action references.

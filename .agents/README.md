@@ -55,3 +55,7 @@ evals/
 - Every action manifest must pass semantic schema validation in `tests/test-action-yaml.rb` before smoke tests run.
 - Public action-surface changes require a matching deterministic eval criterion.
 - CI must exercise hosted-runner behavior across Ubuntu, macOS, and Windows plus at least one non-host Rust target.
+
+- Cache writes require explicit opt-in and default-branch push policy; PRs restore only.
+- `cache-targets: false` and `cache-bin: false` keep compiled artifacts out of the dependency cache.
+- Cache policy changes require `tests/test_cache_policy.py`; local reuse evidence comes from `evals/measure_local_reuse.py`, never inferred hosted savings.

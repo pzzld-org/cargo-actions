@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: explicit cache trust policy
+
+- Default to dependency restore only; gate writes on opt-in default-branch pushes.
+- Use the sccache GHA READ_ONLY mode for restore-only events and pin sccache 0.17.0.
+- Exclude Cargo binaries from the dependency cache and expose effective policy outputs.
+- Add cache event fixtures, local Cargo freshness measurement, and caller policy documentation.
+- Keep manifest validation compatible with macOS system Ruby 2.6.
+
 ## Unreleased
 
 ### Added

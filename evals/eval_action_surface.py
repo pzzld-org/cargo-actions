@@ -64,9 +64,20 @@ CHECKS = {
     ),
     "src/setup-rust-cache/action.yml": (
         "steps.rust-cache.outputs.cache-hit",
-        "cache key must not be empty",
+        'save-if: ${{ steps.policy.outputs.write-enabled }}',
+        "cache-bin: 'false'",
+        'version: v0.17.0',
+        'SCCACHE_GHA_RW_MODE: ${{ steps.policy.outputs.sccache-mode }}',
+        "if: steps.policy.outputs.sccache-enabled == 'true'",
         "sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11",
         "rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2",
+    ),
+    "src/_shared/cache-policy.sh": (
+        'require_bool save-if',
+        'require_bool sccache',
+        'cache key must not be empty',
+        '"${GITHUB_EVENT_NAME:-}" == push',
+        '"${GITHUB_REF:-}" == "refs/heads/${CARGO_ACTION_DEFAULT_BRANCH}"',
     ),
     "src/_shared/lib.sh": (
         "require_bool",
@@ -107,6 +118,13 @@ def main() -> int:
         text = path.read_text() if path.is_file() else ""
         for needle in needles:
             checks.append({"artifact": relative, "criterion": needle, "passed": needle in text})
+
+    for name in ("build", "check", "test", "bench", "clippy", "doc"):
+        path = ROOT / f"src/cargo-{name}-action/action.yml"
+        for needle in ("save-if: ${{ inputs.cache-save-if }}", "sccache: ${{ inputs.cache-sccache }}",
+                       "value: ${{ steps.cache.outputs.write-enabled }}"):
+            checks.append({"artifact": str(path.relative_to(ROOT)), "criterion": needle,
+                           "passed": needle in path.read_text()})
 
     passed = sum(bool(check["passed"]) for check in checks)
     score = passed / len(checks)

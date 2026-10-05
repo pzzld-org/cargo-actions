@@ -101,7 +101,7 @@ paths.each do |path|
     end
   end
 
-  duplicates = ids.tally.select { |_id, count| count > 1 }.keys
+  duplicates = ids.group_by { |id| id }.select { |_id, values| values.length > 1 }.keys
   failures << "#{relative}: duplicate step ids: #{duplicates.join(', ')}" unless duplicates.empty?
 end
 
