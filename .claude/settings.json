@@ -1,0 +1,30 @@
+{
+  "autoCompactEnabled": true,
+  "autoDreamEnabled": true,
+  "autoMemoryEnabled": true,
+  "effortLevel": "xhigh",
+  "enableAllProjectMcpServers": true,
+  "includeCoAuthoredBy": false,
+  "model": "sonnet",
+  "outputStyle": "concise",
+  "skipDangerousModePermissionPrompt": true,
+  "enabledPlugins": {
+    "hookify@claude-plugins-official": true,
+    "shepherd@shepherd": true
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  },
+  "extraKnownMarketplaces": {
+    "shepherd": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/pzzld-org/shepherd.git"
+      }
+    }
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
+}
