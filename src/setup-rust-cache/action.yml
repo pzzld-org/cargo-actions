@@ -1,20 +1,36 @@
 name: Cargo Cache
-description: Enable shared sccache compiler caching and Rust dependency caching.
+description: Configure shared sccache compiler caching and Cargo dependency caching for Rust jobs.
+author: pzzld-org
 
 inputs:
   key:
-    description: Stable cache key for this job or matrix leg.
+    description: Stable cache key shared by compatible jobs or matrix legs.
     required: true
   workspaces:
-    description: Cargo workspace root(s) to cache, relative to the job workspace.
+    description: Cargo workspace roots passed to Swatinem/rust-cache, one workspace specification per line.
     required: false
-    default: "."
+    default: '.'
+
+outputs:
+  cache-hit:
+    description: Whether rust-cache restored an exact dependency-cache match.
+    value: ${{ steps.rust-cache.outputs.cache-hit }}
 
 runs:
   using: composite
   steps:
+    - name: Validate cache inputs
+      shell: bash
+      env:
+        CARGO_ACTION_CACHE_KEY: ${{ inputs.key }}
+      run: |
+        if [[ -z "${CARGO_ACTION_CACHE_KEY}" ]]; then
+          echo 'cargo-actions: cache key must not be empty' >&2
+          exit 2
+        fi
+
     - name: Setup sccache
-      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
     - name: Enable sccache GitHub Actions backend
       shell: bash
@@ -23,8 +39,9 @@ runs:
         echo "SCCACHE_GHA_ENABLED=true" >> "${GITHUB_ENV}"
 
     - name: Setup Rust dependency cache
-      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      id: rust-cache
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         shared-key: ${{ inputs.key }}
-        cache-targets: false
+        cache-targets: 'false'
         workspaces: ${{ inputs.workspaces }}

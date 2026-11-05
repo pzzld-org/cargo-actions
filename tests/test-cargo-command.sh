@@ -24,9 +24,11 @@ assert_capture() {
 }
 
 reset_env() {
-  for var in $(env | sed -n 's/^\(CARGO_ACTION_[A-Z0-9_]*\)=.*/\1/p'); do
-    unset "$var"
-  done
+  while IFS='=' read -r name _; do
+    case "$name" in
+      CARGO_ACTION_*) unset "$name" ;;
+    esac
+  done < <(env)
   export CARGO_CAPTURE="${TMP}/capture"
 }
 
@@ -141,4 +143,28 @@ if bash "${RUNNER}" check >"${TMP}/invalid.out" 2>"${TMP}/invalid.err"; then
 fi
 grep -F 'verbose=true and quiet=true are mutually exclusive' "${TMP}/invalid.err" >/dev/null
 
-echo "cargo-command contract: ok"
+reset_env
+export CARGO_ACTION_CACHE=yes
+if bash "${RUNNER}" check >"${TMP}/invalid.out" 2>"${TMP}/invalid.err"; then
+  echo "expected non-canonical boolean to fail" >&2
+  exit 1
+fi
+grep -F 'cache must be true or false (got: yes)' "${TMP}/invalid.err" >/dev/null
+
+reset_env
+export CARGO_ACTION_COLOR=rainbow
+if bash "${RUNNER}" check >"${TMP}/invalid.out" 2>"${TMP}/invalid.err"; then
+  echo "expected invalid color to fail" >&2
+  exit 1
+fi
+grep -F 'color must be one of: auto always never (got: rainbow)' "${TMP}/invalid.err" >/dev/null
+
+reset_env
+export CARGO_ACTION_ARTIFACT_COMPRESSION_LEVEL=10
+if bash "${RUNNER}" build >"${TMP}/invalid.out" 2>"${TMP}/invalid.err"; then
+  echo "expected invalid artifact compression level to fail" >&2
+  exit 1
+fi
+grep -F 'artifact-compression-level must be between 0 and 9 (got: 10)' "${TMP}/invalid.err" >/dev/null
+
+printf 'cargo-command contract: ok\n'
