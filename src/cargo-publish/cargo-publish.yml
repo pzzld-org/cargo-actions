@@ -1,0 +1,70 @@
+# [title] cargo-publish
+# [description] a reusable, custom GHA workflow for publishing a crate to crates-io
+name: cargo-publish
+
+concurrency:
+  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+on:
+  workflow_call:
+    inputs:
+      all-features:
+        required: false
+        default: false
+        type: boolean
+      all-targets:
+        required: false
+        default: false
+        type: boolean
+      package:
+        description: "Which package would you like to publish?"
+        required: false
+        type: string
+      publish:
+        description: "Publish to crates.io?"
+        required: true
+        default: true
+        type: boolean
+      target:
+        description: "Which target(s) would you like to publish?"
+        required: false
+        type: string
+      toolchain:
+        description: "Select the toolchain to build with (default: stable):"
+        default: stable
+        required: true
+        type: string
+      token:
+        description: "Provide the token for the registry"
+        required: true
+        type: string
+      workspace:
+        description: "Publish all crates within the workspace?"
+        default: true
+        type: boolean
+
+jobs:
+  crates-io:
+    permissions:
+      contents: read
+      packages: write
+      deployments: write
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_REGISTRY_TOKEN: ${{ inputs.token }}
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+      RUST_LOG: vaulted=debug,info
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup rustup
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          cache: true
+          override: true
+          toolchain: ${{ inputs.toolchain }}
+      - name: Publish
+        if: inputs.publish
+        run: cargo publish --all-features --locked --verbose --workspace
