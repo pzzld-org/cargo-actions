@@ -157,7 +157,7 @@ def main() -> int:
         fail("cache: pinned rust-cache action missing")
     if "id: rust-cache" not in cache or "steps.rust-cache.outputs.cache-hit" not in cache:
         fail("cache: cache-hit output is not wired")
-    if "cache key must not be empty" not in cache:
+    if "cache key must not be empty" not in read(ROOT / "src/_shared/cache-policy.sh"):
         fail("cache: required key is not enforced at runtime")
 
     shared = read(ROOT / "src/_shared/cargo-command.sh")

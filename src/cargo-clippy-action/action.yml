@@ -167,6 +167,14 @@ inputs:
     description: Enable the shared sccache and Cargo dependency-cache layers.
     required: false
     default: 'true'
+  cache-save-if:
+    description: Opt in to cache writes on default-branch pushes only. PRs and other events remain restore-only.
+    required: false
+    default: 'false'
+  cache-sccache:
+    description: Enable pinned compiler caching; its GHA backend is read-only unless writes are permitted.
+    required: false
+    default: 'true'
   cache-key:
     description: Override the shared cache key. Empty derives a key from OS, toolchain, and compilation target.
     required: false
@@ -177,6 +185,15 @@ inputs:
     default: ''
 
 outputs:
+  cache-write-enabled:
+    description: Whether cache writes were permitted by policy. Empty when caching is disabled.
+    value: ${{ steps.cache.outputs.write-enabled }}
+  sccache-mode:
+    description: READ_ONLY, READ_WRITE, or disabled. Empty when caching is disabled.
+    value: ${{ steps.cache.outputs.sccache-mode }}
+  sccache-enabled:
+    description: Whether the action configured sccache. Empty when caching is disabled.
+    value: ${{ steps.cache.outputs.sccache-enabled }}
   cache-hit:
     description: Whether rust-cache restored an exact dependency-cache match. Empty when cache is disabled.
     value: ${{ steps.cache.outputs.cache-hit }}
@@ -199,6 +216,8 @@ runs:
       with:
         key: ${{ inputs.cache-key || format('cargo-{0}-{1}-{2}', runner.os, inputs.toolchain, inputs.target || 'host') }}
         workspaces: ${{ inputs.cache-workspaces || inputs.working-directory }}
+        save-if: ${{ inputs.cache-save-if }}
+        sccache: ${{ inputs.cache-sccache }}
 
     - name: Clippy
       shell: bash

@@ -166,14 +166,25 @@ The repository CI independently smoke-tests `wasm32-unknown-unknown` so target i
 
 Compile actions compose `src/setup-rust-cache` through GitHub's same-repository `$/src/setup-rust-cache` reference. The reference resolves against the repository and revision of the running action, so consumers do not need to check out `cargo-actions` separately and the cache implementation cannot accidentally resolve against the caller workspace.
 
-The cache primitive uses:
+Dependency caching restores by default. `cache-save-if: 'true'` opts into writes
+only on a push to the repository default branch; other events remain restore-only.
+The cache excludes target directories and installed Cargo binaries. Pinned sccache
+0.17.0 uses `READ_ONLY` by default and `READ_WRITE` only when permitted;
+`cache-sccache: 'false'` skips compiler-cache setup.
+This changes the previous implicit writable compiler-cache default.
 
-1. `mozilla-actions/sccache-action` for compiler caching;
-2. `Swatinem/rust-cache` with `cache-targets: false` for dependency caching.
+Default dependency keys remain shared across Cargo operations for the same OS,
+toolchain and target. `cache-workspaces` defaults to `working-directory`; an
+explicit override uses upstream workspace syntax relative to the job workspace.
+Features and profiles affect compiled artifacts, not source archive compatibility.
+Cargo/sccache retain their own compiler fingerprints; an exact dependency-cache
+hit does not prove compiled-artifact reuse.
 
-Default dependency-cache keys are shared across compatible Cargo operations and derive from operating system, toolchain, and target. By default, the dependency-cache workspace is the action's `working-directory`, so Cargo metadata and lockfile hashing are evaluated against the same project that the action executes. `cache-workspaces` is an explicit override: when set, its newline-delimited values are passed through using `Swatinem/rust-cache` workspace syntax and are relative to the job workspace. Set `cache-key` when a caller needs an additional partition. Every compile action exposes `cache-hit` for downstream composition.
-
-`$/...` same-repository action references are supported on GitHub.com. GitHub Enterprise Server does not currently support this reference form; GHES consumers need a compatibility release that uses a different composition strategy.
+Set up caching once per job, then use `cache: 'false'` on later actions. Outputs
+`cache-hit`, `cache-write-enabled`, `sccache-enabled` and `sccache-mode` distinguish an exact
+dependency match from policy/configuration. Read the
+[cache and event contract](docs/cache-and-event-contract.md) for fork trust,
+configuration compatibility, caller concurrency, sources and rollout decisions.
 
 ## Build artifacts
 

@@ -56,6 +56,9 @@ jobs:
       - name: Validate action metadata contracts
         run: python3 tests/test_action_contracts.py
 
+      - name: Exercise cache event policy
+        run: python3 tests/test_cache_policy.py
+
       - name: Evaluate public action surface
         run: python3 evals/eval_action_surface.py
 
